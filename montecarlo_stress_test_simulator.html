@@ -1,0 +1,301 @@
+<style>
+.mc{font-family:var(--font-mono);font-size:13px;color:var(--color-text-primary);}
+.mc-card{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px;margin-bottom:10px;}
+.mc-lbl{color:var(--color-text-secondary);font-size:11px;display:block;margin-bottom:5px;}
+.mc-btn{background:transparent;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);color:var(--color-text-secondary);padding:5px 12px;cursor:pointer;font-family:var(--font-mono);font-size:11px;transition:all .15s;}
+.mc-btn:hover,.mc-btn.active{background:var(--color-background-secondary);border-color:var(--color-border-primary);color:var(--color-text-primary);}
+.mc-btn.stress{border-color:var(--color-border-danger);color:var(--color-text-danger);}
+.mc-btn.stress.active{background:var(--color-background-danger);}
+.mc-choice{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:13px 12px;cursor:pointer;text-align:left;width:100%;font-family:var(--font-mono);transition:border-color .15s;color:var(--color-text-primary);}
+.mc-choice:hover{border-color:var(--color-border-primary);}
+.mc-stat{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px;text-align:center;}
+</style>
+
+<div class="mc">
+
+<div class="mc-card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;">
+  <div>
+    <div style="font-size:15px;font-weight:500;">투자 모의주행 시뮬레이터</div>
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">하위 10% 시나리오 · 손실 면역 훈련 · GBM 몬테카를로 250경로</div>
+  </div>
+  <div style="font-size:19px;">🚗</div>
+</div>
+
+<div class="mc-card">
+  <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;align-items:start;">
+    <div>
+      <span class="mc-lbl">자산군</span>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;" id="presetBtns"></div>
+      <div id="presetDesc" style="font-size:10px;color:var(--color-text-secondary);margin-top:5px;"></div>
+    </div>
+    <div>
+      <span class="mc-lbl">투자금: <span id="s0Lbl" style="color:var(--color-text-primary);font-weight:500;"></span></span>
+      <input type="range" id="s0Sl" min="1000000" max="100000000" step="1000000" style="width:100%;"/>
+    </div>
+    <div>
+      <span class="mc-lbl">기간: <span id="wLbl" style="color:var(--color-text-primary);font-weight:500;"></span></span>
+      <input type="range" id="wSl" min="12" max="260" step="4" style="width:100%;"/>
+      <button class="mc-btn" onclick="rerun()" style="margin-top:8px;width:100%;font-size:12px;">재시뮬레이션 ↻</button>
+    </div>
+  </div>
+</div>
+
+<div class="mc-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;">
+      <button class="mc-btn active" id="btnFan" onclick="setFanMode()">시나리오 분포</button>
+      <button class="mc-btn stress" id="btnStress" onclick="setStressMode()">스트레스 테스트 시작 →</button>
+    </div>
+    <div id="stressCtrl" style="display:none;font-size:12px;color:var(--color-text-secondary);display:none;align-items:center;gap:8px;">
+      <button class="mc-btn" id="ppBtn" onclick="togglePlay()" style="padding:4px 10px;"></button>
+      <span id="sProg"></span>
+      <span id="sVal" style="font-weight:500;margin-left:4px;"></span>
+    </div>
+  </div>
+
+  <div id="progWrap" style="display:none;height:3px;background:var(--color-border-tertiary);border-radius:2px;margin-bottom:8px;overflow:hidden;">
+    <div id="progFill" style="height:100%;width:0%;background:#D85A30;transition:width .08s;"></div>
+  </div>
+
+  <svg id="mainChart" viewBox="0 0 680 258" style="width:100%;height:auto;display:block;"></svg>
+
+  <div id="statsRow" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px;"></div>
+  <div id="dpPanel"></div>
+</div>
+
+<div id="resultPanel" class="mc-card" style="display:none;"></div>
+
+<div id="guide" style="font-size:11px;color:var(--color-text-secondary);padding:4px 2px;line-height:1.8;">
+  파라미터 설정 후 <span style="color:var(--color-text-danger);font-weight:500;">스트레스 테스트 시작</span>을 누르면 하위 10% 시나리오가 주 단위로 전개됩니다. 하락 구간마다 버티기·추가매수·손절 중 선택하고 결과를 확인하세요.
+</div>
+
+</div>
+
+<script>
+const randn=()=>{const u=Math.random()||1e-10,v=Math.random()||1e-10;return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+function runGBM(S0,T,mu,sig,N){const dt=1/52,d=(mu-.5*sig*sig)*dt,s=sig*Math.sqrt(dt),arr=[];for(let i=0;i<N;i++){const p=[S0];for(let t=0;t<T;t++)p.push(p[p.length-1]*Math.exp(d+s*randn()));arr.push(p);}return arr;}
+function calcPcts(paths,T,ps){const r={};ps.forEach(p=>r[p]=[]);for(let t=0;t<=T;t++){const s=paths.map(p=>p[t]).sort((a,b)=>a-b);ps.forEach(p=>r[p].push(s[Math.min(Math.floor(p/100*(s.length-1)),s.length-1)]));}return r;}
+const fw=n=>{const a=Math.abs(n);if(a>=1e8)return(n/1e8).toFixed(1)+'억원';if(a>=1e4)return Math.round(n/1e4).toLocaleString()+'만원';return Math.round(n).toLocaleString()+'원';};
+const fp=r=>(r>=0?'+':'')+(r*100).toFixed(1)+'%';
+
+let sim=null,S0=10000000,weeks=52,presetKey='국내주식';
+let mode='fan',step=0,playing=false,decisions=[],pendingDP=null,done=false;
+let firedLevels=new Set(),hasSold=false,animTimer=null;
+
+const PRESETS={'국내주식':{mu:.08,sigma:.22,desc:'기대수익 8% · 변동성 22%'},'미국주식':{mu:.10,sigma:.18,desc:'기대수익 10% · 변동성 18%'},'혼합ETF':{mu:.06,sigma:.12,desc:'기대수익 6% · 변동성 12%'},'암호화폐':{mu:.20,sigma:.70,desc:'기대수익 20% · 변동성 70%'}};
+const DD=[-0.10,-0.20,-0.30];
+const NEWS={'-0.1':'📰 "증시 조정 우려... 개인투자자 불안 고조"','-0.2':'📰 "외국인 대규모 매도, 공포지수 급등"','-0.3':'📰 "블랙먼데이 재현?... 패닉셀 행렬"'};
+
+function stopAnim(){if(animTimer){clearInterval(animTimer);animTimer=null;}}
+
+function compute(){
+  const{mu,sigma}=PRESETS[presetKey];
+  const paths=runGBM(S0,weeks,mu,sigma,250);
+  const pcts=calcPcts(paths,weeks,[5,10,25,50,75,90,95]);
+  const target=pcts[10][weeks];
+  const sp=paths.reduce((b,p)=>Math.abs(p[weeks]-target)<Math.abs(b[weeks]-target)?p:b);
+  sim={pcts,stressPath:sp};
+  renderAll();
+}
+
+function rerun(){stopAnim();step=0;playing=false;decisions=[];pendingDP=null;done=false;firedLevels.clear();hasSold=false;mode='fan';compute();}
+
+function tick(){
+  step++;
+  if(step>=weeks){step=weeks;playing=false;done=true;stopAnim();renderAll();return;}
+  if(!hasSold){
+    const dd=(sim.stressPath[step]-S0)/S0;
+    for(const level of DD){
+      if(dd<=level&&!firedLevels.has(level)){
+        firedLevels.add(level);pendingDP={step,level,value:sim.stressPath[step]};
+        playing=false;stopAnim();break;
+      }
+    }
+  }
+  renderChart();renderProgress();renderStressCtrl();
+  if(pendingDP)renderDP();
+}
+
+function togglePlay(){
+  if(pendingDP)return;
+  playing=!playing;
+  if(playing){stopAnim();animTimer=setInterval(tick,75);}
+  else stopAnim();
+  renderStressCtrl();
+}
+
+function setFanMode(){stopAnim();mode='fan';playing=false;renderAll();}
+
+function setStressMode(){
+  stopAnim();mode='stress';step=0;decisions=[];pendingDP=null;done=false;
+  firedLevels.clear();hasSold=false;playing=true;
+  renderAll();
+  animTimer=setInterval(tick,75);
+}
+
+function handleDecision(choice){
+  if(!pendingDP)return;
+  decisions.push({...pendingDP,choice});
+  if(choice==='sell')hasSold=true;
+  pendingDP=null;playing=true;
+  stopAnim();animTimer=setInterval(tick,75);
+  renderAll();
+}
+
+function renderChart(){
+  if(!sim)return;
+  const svg=document.getElementById('mainChart');
+  const W=680,H=258,PL=62,PR=10,PT=10,PB=28,cW=W-PL-PR,cH=H-PT-PB;
+  const{pcts,stressPath}=sim;
+  const allV=[...pcts[5],...pcts[95]];
+  const minV=Math.max(0,Math.min(...allV)*.88),maxV=Math.max(...allV)*1.06;
+  const xf=t=>PL+t/weeks*cW;
+  const yf=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+  const ln=(arr,upTo)=>{const a=upTo!==undefined?arr.slice(0,upTo+1):arr;return a.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('');};
+  const band=(hi,lo)=>{const f=hi.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('');const b=[...lo].reverse().map((v,i)=>`L${xf(lo.length-1-i).toFixed(1)},${yf(v).toFixed(1)}`).join('');return f+b+'Z';};
+  const visSP=mode==='stress'?stressPath.slice(0,step+1):stressPath;
+  const spD=visSP.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('');
+  const cs=Math.min(step,stressPath.length-1);
+  const cx=xf(cs).toFixed(1),cy=yf(stressPath[cs]).toFixed(1);
+  const gN=5,grids=Array.from({length:gN+1},(_,i)=>minV+i*(maxV-minV)/gN);
+  const wSt=weeks<=52?8:weeks<=104?13:26,wTks=Array.from({length:Math.floor(weeks/wSt)+1},(_,i)=>i*wSt);
+  const gLines=grids.map(v=>`<line x1="${PL}" y1="${yf(v).toFixed(1)}" x2="${PL+cW}" y2="${yf(v).toFixed(1)}" style="stroke:var(--color-border-tertiary)" stroke-width="1"/>
+    <text x="${PL-4}" y="${(yf(v)+4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font-mono)" style="fill:var(--color-text-secondary)">${fw(v)}</text>`).join('');
+  const wLines=wTks.map(w=>`<line x1="${xf(w).toFixed(1)}" y1="${PT}" x2="${xf(w).toFixed(1)}" y2="${PT+cH}" style="stroke:var(--color-border-tertiary)" stroke-width="1"/>
+    <text x="${xf(w).toFixed(1)}" y="${PT+cH+16}" text-anchor="middle" font-size="10" font-family="var(--font-mono)" style="fill:var(--color-text-secondary)">${w}주</text>`).join('');
+  const decM=decisions.map(d=>{const col=d.choice==='sell'?'#BA7517':d.choice==='buy'?'#1D9E75':'#888780';const lbl=d.choice==='sell'?'매도':d.choice==='buy'?'추가':'보유';const dx=xf(d.step).toFixed(1),dy=yf(stressPath[d.step]).toFixed(1);return`<circle cx="${dx}" cy="${dy}" r="5" fill="${col}" stroke="white" stroke-width="1.2" opacity=".9"/><text x="${dx}" y="${(parseFloat(dy)-9).toFixed(1)}" text-anchor="middle" font-size="9" fill="${col}" font-family="var(--font-mono)">${lbl}</text>`;}).join('');
+  svg.innerHTML=`${gLines}${wLines}
+    <path d="${band(pcts[90],pcts[10])}" fill="rgba(55,138,221,0.07)"/>
+    <path d="${band(pcts[75],pcts[25])}" fill="rgba(55,138,221,0.14)"/>
+    <line x1="${PL}" y1="${yf(S0).toFixed(1)}" x2="${PL+cW}" y2="${yf(S0).toFixed(1)}" stroke="#BA7517" stroke-width="1" stroke-dasharray="4,4" opacity=".4"/>
+    <text x="${PL+5}" y="${(yf(S0)-4).toFixed(1)}" font-size="10" font-family="var(--font-mono)" fill="#BA7517" opacity=".55">원금 ${fw(S0)}</text>
+    <path d="${ln(pcts[50])}" fill="none" stroke="#1D9E75" stroke-width="2" opacity=".8"/>
+    <path d="${ln(pcts[10])}" fill="none" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="5,3" opacity="${mode==='stress'?.18:.7}"/>
+    <path d="${spD}" fill="none" stroke="#D85A30" stroke-width="${mode==='stress'?2.5:1.5}" opacity="${mode==='stress'?1:.45}"/>
+    ${mode==='stress'&&step>0?`<circle cx="${cx}" cy="${cy}" r="5" fill="#D85A30" stroke="rgba(216,90,48,.25)" stroke-width="7"/>`:``}
+    ${decM}
+    <g transform="translate(${PL+8},${PT+8})">
+      <rect x="-3" y="-3" width="180" height="17" rx="3" style="fill:var(--color-background-secondary)" opacity=".85"/>
+      <line x1="2" y1="6" x2="20" y2="6" stroke="#1D9E75" stroke-width="2"/>
+      <text x="24" y="10" font-size="10" font-family="var(--font-mono)" style="fill:var(--color-text-secondary)">중앙값</text>
+      <line x1="72" y1="6" x2="90" y2="6" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <text x="94" y="10" font-size="10" font-family="var(--font-mono)" style="fill:var(--color-text-secondary)">하위 10%</text>
+      <rect x="150" y="2" width="8" height="8" fill="rgba(55,138,221,0.22)"/>
+      <text x="162" y="10" font-size="10" font-family="var(--font-mono)" style="fill:var(--color-text-secondary)">범위</text>
+    </g>`;
+}
+
+function renderProgress(){
+  const wrap=document.getElementById('progWrap'),fill=document.getElementById('progFill');
+  if(mode==='stress'){wrap.style.display='block';fill.style.width=`${(step/weeks)*100}%`;}
+  else wrap.style.display='none';
+}
+
+function renderStressCtrl(){
+  const el=document.getElementById('stressCtrl'),pp=document.getElementById('ppBtn'),prog=document.getElementById('sProg'),val=document.getElementById('sVal');
+  if(mode!=='stress'){el.style.display='none';return;}
+  el.style.display='flex';
+  pp.textContent=playing?'⏸ 일시정지':'▶ 재생';
+  prog.textContent=done?`완료 (${weeks}주)` : `${step}주 / ${weeks}주`;
+  if(sim){const v=sim.stressPath[Math.min(step,sim.stressPath.length-1)],r=(v-S0)/S0;val.textContent=`${fw(v)}  ${fp(r)}`;val.style.color=r<=-.2?'var(--color-text-danger)':r<=-.05?'#D85A30':'var(--color-text-success)';}
+}
+
+function renderStats(){
+  const row=document.getElementById('statsRow');
+  if(mode!=='fan'||!sim){row.style.display='none';return;}
+  row.style.display='grid';
+  const items=[{label:'하위 5%',p:5,col:'#993C1D'},{label:'하위 10%',p:10,col:'#D85A30'},{label:'중앙값',p:50,col:'#1D9E75'},{label:'상위 90%',p:90,col:'#185FA5'},{label:'상위 95%',p:95,col:'#0C447C'}];
+  row.innerHTML=items.map(({label,p,col})=>{const v=sim.pcts[p][weeks],r=(v-S0)/S0;return`<div class="mc-stat"><div style="font-size:10px;color:var(--color-text-secondary);">${label}</div><div style="font-size:14px;font-weight:500;color:${col};margin-top:2px;">${fw(v)}</div><div style="font-size:11px;color:${col};">${fp(r)}</div></div>`;}).join('');
+}
+
+function renderDP(){
+  const el=document.getElementById('dpPanel');
+  if(!pendingDP||mode!=='stress'){el.innerHTML='';return;}
+  const nk=String(pendingDP.level);
+  el.innerHTML=`<div style="background:var(--color-background-danger);border:0.5px solid var(--color-border-danger);border-radius:var(--border-radius-lg);padding:14px;margin-top:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:14px;font-weight:500;color:var(--color-text-danger);">결정의 순간 — ${pendingDP.step}주차</span>
+      <span style="font-size:13px;font-weight:500;color:var(--color-text-danger);">손실 ${fp(pendingDP.level)} · ${fw(pendingDP.value)}</span>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;padding:8px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">${NEWS[nk]||''}</div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">지금 어떻게 하시겠습니까?</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <button class="mc-choice" onclick="handleDecision('hold')"><div style="font-size:16px;margin-bottom:5px;">🧘</div><div style="font-weight:500;font-size:13px;margin-bottom:3px;">버티기</div><div style="font-size:11px;color:var(--color-text-secondary);">감정 억누르고 보유</div></button>
+      <button class="mc-choice" onclick="handleDecision('buy')" style="border-color:var(--color-border-success);"><div style="font-size:16px;margin-bottom:5px;">📈</div><div style="font-weight:500;font-size:13px;margin-bottom:3px;">추가매수</div><div style="font-size:11px;color:var(--color-text-secondary);">+${fw(S0)} 추가 투입</div></button>
+      <button class="mc-choice" onclick="handleDecision('sell')" style="border-color:var(--color-border-danger);"><div style="font-size:16px;margin-bottom:5px;">🚪</div><div style="font-weight:500;font-size:13px;margin-bottom:3px;">손절 매도</div><div style="font-size:11px;color:var(--color-text-secondary);">전량 매도 → 현금</div></button>
+    </div>
+  </div>`;
+}
+
+function renderResult(){
+  const el=document.getElementById('resultPanel');
+  if(!done||!sim){el.style.display='none';return;}
+  el.style.display='block';
+  let units=1,extra=0,soldAt=null;
+  for(const d of [...decisions].sort((a,b)=>a.step-b.step)){
+    const v=sim.stressPath[d.step];
+    if(d.choice==='buy'){units+=S0/v;extra+=S0;}
+    else if(d.choice==='sell'){soldAt=units*v;break;}
+  }
+  const totalIn=S0+extra,finalV=soldAt!==null?soldAt:units*sim.stressPath[weeks];
+  const ret=(finalV-totalIn)/totalIn,medRet=(sim.pcts[50][weeks]-S0)/S0,holdRet=(sim.stressPath[weeks]-S0)/S0;
+  const rc=ret>=0?'var(--color-text-success)':'var(--color-text-danger)';
+  const dlog=decisions.length===0?`<div style="font-size:12px;color:var(--color-text-secondary);">결정 없음 (자동 보유)</div>`:
+    decisions.map(d=>{const col=d.choice==='sell'?'#BA7517':d.choice==='buy'?'#1D9E75':'#888780';const lbl=d.choice==='sell'?'손절 매도':d.choice==='buy'?'추가매수':'버티기';return`<div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:3px;">${d.step}주차 ${fp(d.level)}: <span style="color:${col};font-weight:500;">${lbl}</span></div>`;}).join('');
+  el.innerHTML=`<div style="font-size:14px;font-weight:500;margin-bottom:12px;">시뮬레이션 완료</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
+      <div>
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:5px;">내 최종 결과</div>
+        <div style="font-size:22px;font-weight:500;color:${rc};">${fw(finalV)}</div>
+        <div style="font-size:14px;color:${rc};margin-bottom:10px;">${fp(ret)}${soldAt!==null?' (손절 후 현금)':''}</div>
+        ${dlog}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;">비교</div>
+        <div style="font-size:12px;margin-bottom:5px;">중앙값 시나리오: <span style="color:#1D9E75;font-weight:500;">${fp(medRet)}</span></div>
+        <div style="font-size:12px;margin-bottom:12px;">하위10% 끝까지 보유: <span style="font-weight:500;color:${holdRet>=0?'#185FA5':'var(--color-text-danger)'};">${fp(holdRet)}</span></div>
+        <div style="font-size:11px;color:var(--color-text-secondary);background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:10px;line-height:1.7;">💡 이 훈련의 핵심: 하위 10% 시나리오를 미리 경험해 실제 하락 시 패닉 매도를 방지합니다. 투자 면허도 모의주행이 먼저. 🚗</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="mc-btn" onclick="setStressMode()">다시 도전 ↻</button>
+      <button class="mc-btn" onclick="rerun()">새 시나리오 생성</button>
+    </div>`;
+}
+
+function renderModeBtns(){
+  document.getElementById('btnFan').className='mc-btn'+(mode==='fan'?' active':'');
+  document.getElementById('btnStress').className='mc-btn stress'+(mode==='stress'?' active':'');
+  document.getElementById('guide').style.display=mode==='fan'?'block':'none';
+}
+
+function renderAll(){renderChart();renderStats();renderProgress();renderStressCtrl();renderDP();renderResult();renderModeBtns();}
+
+// Init preset buttons
+const pbEl=document.getElementById('presetBtns');
+Object.keys(PRESETS).forEach(k=>{
+  const b=document.createElement('button');
+  b.className='mc-btn'+(k===presetKey?' active':'');
+  b.textContent=k;
+  b.onclick=()=>{
+    presetKey=k;
+    document.querySelectorAll('#presetBtns .mc-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('presetDesc').textContent=PRESETS[k].desc;
+  };
+  pbEl.appendChild(b);
+});
+document.getElementById('presetDesc').textContent=PRESETS[presetKey].desc;
+
+const s0Sl=document.getElementById('s0Sl');
+s0Sl.value=S0;
+s0Sl.oninput=()=>{S0=+s0Sl.value;document.getElementById('s0Lbl').textContent=fw(S0);};
+document.getElementById('s0Lbl').textContent=fw(S0);
+
+const wSl=document.getElementById('wSl');
+wSl.value=weeks;
+wSl.oninput=()=>{weeks=+wSl.value;document.getElementById('wLbl').textContent=`${weeks}주 / ${(weeks/52).toFixed(1)}년`;};
+document.getElementById('wLbl').textContent=`${weeks}주 / ${(weeks/52).toFixed(1)}년`;
+
+compute();
+</script>

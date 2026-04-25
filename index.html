@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>seneca · 투자 모의주행 — Loss Immunity Training</title>
+<meta name="description" content="11자산 다변량 GBM 몬테카를로로 하위 10% 시나리오를 미리 체험. 손실 면역 훈련.">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="shortcut icon" href="assets/favicon.ico">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+:root{
+  --bg:#fff; --bg-soft:#f8fafc; --bg-card:#fff; --bg-danger:#fef2f2; --bg-success:#f0fdf4; --bg-warn:#fffbeb;
+  --ink:#0b1220; --ink-2:#334155; --ink-3:#64748b; --muted:#94a3b8;
+  --hairline:#e2e8f0; --hairline-2:#cbd5e1;
+  --accent:#1d4ed8; --accent-deep:#1e3a8a; --accent-mid:#3b82f6; --accent-soft:#93c5fd; --accent-faint:#dbeafe;
+  --success:#1D9E75; --warn:#BA7517; --danger:#a8392c; --danger-soft:#dc2626;
+  --sans:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --r-md:8px; --r-lg:16px; --r-xl:20px;
+  --color-text-primary:var(--ink); --color-text-secondary:var(--ink-2); --color-text-danger:var(--danger); --color-text-success:var(--success);
+  --color-background-primary:var(--bg-soft); --color-background-secondary:var(--bg-card); --color-background-danger:var(--bg-danger);
+  --color-border-tertiary:var(--hairline); --color-border-secondary:var(--hairline-2); --color-border-primary:var(--accent);
+  --color-border-danger:var(--danger); --color-border-success:var(--success);
+  --font-mono:var(--mono); --border-radius-md:var(--r-md); --border-radius-lg:var(--r-lg);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg-soft);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{font-size:14px;line-height:1.55}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-deep)}
+button{font-family:inherit}
+.topbar{display:flex;align-items:center;gap:16px;padding:10px 20px;background:#fff;border-bottom:1px solid var(--hairline);flex-shrink:0}
+.topbar .brand{font-weight:700;font-size:15px;color:var(--ink);display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.topbar .brand .logo{height:26px;width:auto;display:block}
+.topbar .brand .sub{color:var(--ink-3);font-weight:500;font-size:13px}
+.topbar .back-home{margin-left:auto;color:var(--ink-3);font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.topbar .back-home:hover{color:var(--accent)}
+.topbar .back-home .logo{height:22px;width:auto;display:block}
+.page{max-width:980px;margin:0 auto;padding:24px 20px 80px}
+.card{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:14px}
+.card-soft{background:var(--bg-soft);border:1px solid var(--hairline)}
+.lbl{display:block;color:var(--ink-3);font-size:11px;font-weight:500;letter-spacing:.02em;text-transform:uppercase;margin-bottom:6px}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn{background:#fff;border:1px solid var(--hairline-2);border-radius:var(--r-md);color:var(--ink-2);padding:7px 14px;cursor:pointer;font-size:12.5px;font-weight:500;transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.active{background:var(--accent-faint);border-color:var(--accent);color:var(--accent-deep)}
+.btn.danger{border-color:#fca5a5;color:var(--danger)}
+.btn.danger:hover{background:var(--bg-danger);border-color:var(--danger)}
+.btn.danger.active{background:var(--bg-danger);border-color:var(--danger);color:var(--danger)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--hairline)}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:var(--hairline);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--accent);border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px var(--hairline-2)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;background:var(--accent);border-radius:50%;cursor:pointer;border:2px solid #fff}
+
+/* Header / quotes */
+.hero{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--r-xl);padding:20px 22px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero h1{margin:0 0 4px;font-size:18px;font-weight:800;letter-spacing:-.01em}
+.hero .subtitle{color:var(--ink-3);font-size:12.5px;margin-bottom:14px}
+.quotes{margin-top:6px}
+.quote{padding:14px 18px;background:var(--bg-soft);border-radius:var(--r-md);border-left:3px solid var(--accent);position:relative}
+.quote.s2{border-left-color:var(--warn)}
+.quote .q{font-style:italic;font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}
+.quote .q-kr{font-style:normal;color:var(--ink-2);font-size:13px;margin-top:8px;line-height:1.65}
+.quote .src{color:var(--ink-3);font-size:11.5px;margin-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.quote .src .author{font-weight:600;color:var(--ink-2)}
+.quote .reroll{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--ink-3);font-size:14px;cursor:pointer;opacity:.4;transition:opacity .15s;padding:2px 4px}
+.quote .reroll:hover{opacity:1;color:var(--accent)}
+
+/* Allocation card */
+.alloc-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+@media (max-width:720px){.alloc-row{grid-template-columns:1fr 1fr}}
+.alloc-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.weights{display:none;grid-template-columns:1fr 1fr;gap:8px 18px;padding:10px 4px 0;border-top:1px dashed var(--hairline);margin-top:8px}
+.weights.show{display:grid}
+.w-row{display:grid;grid-template-columns:90px 1fr 38px;gap:10px;align-items:center;font-size:12px}
+.w-row .nm{color:var(--ink-2)}
+.w-row .v{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;text-align:right}
+.alloc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--hairline)}
+.alloc-stat{text-align:center}
+.alloc-stat .t{font-size:10.5px;color:var(--ink-3);margin-bottom:2px}
+.alloc-stat .v{font-size:13px;font-weight:600;color:var(--ink)}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-soft);border-radius:var(--r-md);font-size:12px;margin-top:6px}
+.sum-row.bad{background:var(--bg-danger);color:var(--danger);font-weight:600}
+
+/* Params */
+.params{display:grid;grid-template-columns:1fr 1fr auto;gap:18px;align-items:end}
+@media (max-width:720px){.params{grid-template-columns:1fr}}
+.val{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* Chart card */
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap}
+.mode-toggle{display:flex;gap:6px}
+.gear{position:relative}
+.gear-btn{background:none;border:none;color:var(--ink-3);cursor:pointer;opacity:.45;font-size:14px;padding:4px 6px;transition:opacity .15s}
+.gear-btn:hover,.gear-btn.open{opacity:1;color:var(--accent)}
+.gear-menu{position:absolute;right:0;top:28px;background:#fff;border:1px solid var(--hairline-2);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,.06);min-width:240px;padding:6px;z-index:20;display:none}
+.gear-menu.show{display:block}
+.gear-menu .opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--ink-2)}
+.gear-menu .opt:hover{background:var(--bg-soft)}
+.gear-menu .opt.sel{background:var(--accent-faint);color:var(--accent-deep);font-weight:600}
+.gear-menu .opt .dot{width:8px;height:8px;border-radius:50%;background:var(--hairline-2);flex-shrink:0}
+.gear-menu .opt.sel .dot{background:var(--accent)}
+.gear-menu .opt.danger.sel .dot{background:var(--danger)}
+.gear-menu small{display:block;color:var(--ink-3);font-size:11px;margin-top:2px}
+
+.phase-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg-soft);border:1px solid var(--hairline);border-radius:999px;font-size:11.5px;color:var(--ink-2);cursor:help;position:relative}
+.phase-badge .dot{width:8px;height:8px;border-radius:50%}
+.phase-badge:hover .ph-tip{display:block}
+.ph-tip{display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--hairline-2);border-radius:var(--r-md);padding:10px 12px;width:300px;font-size:11.5px;color:var(--ink-2);line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.06);z-index:10;text-align:left;cursor:default}
+.ph-tip strong{color:var(--ink);display:block;margin-bottom:4px;font-size:12.5px}
+.ph-tip .sub{color:var(--ink-3);margin-top:6px}
+
+.prog-wrap{display:none;height:3px;background:var(--hairline);border-radius:2px;margin-bottom:8px;overflow:hidden}
+.prog-wrap.show{display:block}
+.prog-fill{height:100%;width:0;background:var(--danger);transition:width .08s}
+#mainChart{width:100%;height:auto;display:block}
+
+.stress-ctrl{display:none;align-items:center;gap:8px;font-size:12px;color:var(--ink-3)}
+.stress-ctrl.show{display:flex}
+.stress-ctrl .v{color:var(--ink);font-weight:600}
+
+.stat-row{display:none;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.stat-row.show{display:grid}
+.stat{padding:10px 8px;text-align:center;background:var(--bg-soft);border:1px solid var(--hairline);border-radius:var(--r-md)}
+.stat .t{font-size:10.5px;color:var(--ink-3)}
+.stat .v{font-size:13.5px;font-weight:600;margin-top:3px}
+.stat .r{font-size:11.5px;margin-top:1px}
+.sigma-help{display:none;margin-top:10px;padding:10px 12px;background:var(--bg-warn);border:1px solid #fde68a;border-radius:var(--r-md);font-size:11.5px;color:var(--ink-2);line-height:1.65}
+.sigma-help.show{display:block}
+.sigma-help b{color:var(--warn)}
+.sigma-help .row{display:flex;flex-wrap:wrap;gap:14px;margin-top:4px;font-variant-numeric:tabular-nums}
+.sigma-help .row span{color:var(--ink-2)}
+.sigma-help .row b{color:var(--ink)}
+
+/* Decision panel */
+.dp{margin-top:12px;background:var(--bg-danger);border:1px solid #fca5a5;border-radius:var(--r-lg);padding:16px 18px;animation:fadein .35s ease;position:relative}
+.dp.shake{animation:fadein .35s ease, shake .5s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}50%{transform:translateX(2px)}75%{transform:translateX(-1px)}}
+.dp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap}
+.dp-title{font-size:14.5px;font-weight:700;color:var(--danger)}
+.dp-loss{font-size:13.5px;font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums}
+.dp-phase{margin-bottom:8px;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:#fff;border:1px solid var(--hairline);border-radius:999px;font-size:12px;color:var(--ink-2);cursor:help;position:relative}
+.dp-phase .info-i{width:14px;height:14px;border-radius:50%;border:1px solid var(--ink-3);color:var(--ink-3);font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-style:italic}
+.dp-news{font-size:13px;color:var(--ink);margin-bottom:8px;padding:10px 12px;background:#fff;border:1px solid var(--hairline);border-radius:var(--r-md)}
+.dp-news .live{display:inline-block;width:8px;height:8px;background:var(--danger-soft);border-radius:50%;margin-right:6px;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.dp-news .worst{font-size:11px;color:var(--ink-3);margin-top:4px;display:flex;justify-content:space-between}
+.dp-tip{font-size:12px;font-style:italic;color:var(--ink-2);background:#fff;border-left:3px solid var(--warn);padding:8px 10px;border-radius:4px;margin-bottom:10px;line-height:1.5}
+.dp-q{font-size:12.5px;color:var(--ink-2);margin-bottom:10px}
+.choices{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media (max-width:560px){.choices{grid-template-columns:1fr}}
+.choice{background:#fff;border:1px solid var(--hairline-2);border-radius:var(--r-md);padding:12px;cursor:pointer;text-align:center;transition:all .15s;font-family:inherit}
+.choice:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.06)}
+.choice.hold:hover{border-color:var(--ink-2)}
+.choice.buy{border-color:#86efac}.choice.buy:hover{border-color:var(--success);background:var(--bg-success)}
+.choice.sell{border-color:#fecaca}.choice.sell:hover{border-color:var(--danger);background:var(--bg-danger)}
+.choice .ic{font-size:22px;margin-bottom:4px}
+.choice .nm{font-size:13px;font-weight:700;margin-bottom:3px}
+.choice .desc{font-size:11px;color:var(--ink-3);line-height:1.4}
+.choice.sell .nm{color:var(--danger)}
+
+/* Result panel */
+.result h2{margin:0 0 10px;font-size:16px;font-weight:700}
+.result-top{display:grid;grid-template-columns:1.2fr 1fr;gap:18px;margin-bottom:18px}
+@media (max-width:720px){.result-top{grid-template-columns:1fr}}
+.result-final{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.result-final-r{font-size:16px;font-weight:600;margin-top:2px}
+.result-decisions{margin-top:12px;font-size:11.5px;color:var(--ink-3);line-height:1.7}
+.result-cmp{font-size:12.5px;line-height:1.9}
+.result-cmp .nm{color:var(--ink-3)}
+.result-cmp .v{font-weight:600;font-variant-numeric:tabular-nums}
+.lesson{margin-top:10px;padding:10px 12px;background:var(--bg-soft);border-radius:var(--r-md);font-size:11.5px;color:var(--ink-2);line-height:1.7}
+
+.timeline{margin-top:16px}
+.timeline h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.tl-bar{position:relative;height:36px;background:var(--bg-soft);border:1px solid var(--hairline);border-radius:var(--r-md);overflow:hidden;display:flex}
+.tl-seg{position:relative;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#fff;font-weight:600;cursor:help;border-right:1px solid rgba(255,255,255,.4);min-width:0;overflow:hidden;white-space:nowrap}
+.tl-seg:last-child{border-right:none}
+.tl-seg .seg-tip{display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--hairline-2);border-radius:var(--r-md);padding:10px 12px;width:280px;font-size:11.5px;color:var(--ink-2);line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.08);z-index:10;text-align:left;color:var(--ink-2);font-weight:400}
+.tl-seg:hover .seg-tip{display:block}
+.tl-axis{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);margin-top:4px}
+.tl-decisions{position:absolute;left:0;right:0;top:0;height:100%;pointer-events:none}
+.tl-mark{position:absolute;width:2px;height:100%;background:rgba(0,0,0,.6)}
+.tl-mark::after{content:'';position:absolute;top:-3px;left:-3px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #000}
+
+.phase-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+@media (max-width:920px){.phase-cards{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:540px){.phase-cards{grid-template-columns:1fr}}
+.pcard{padding:14px;border-radius:var(--r-md);border:1px solid var(--hairline);background:var(--bg-soft);font-size:12px;line-height:1.55;position:relative}
+.pcard.experienced{background:#fff;border-width:2px}
+.pcard .ph-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pcard .ph-icon{font-size:18px}
+.pcard .ph-name{font-weight:700;font-size:13.5px}
+.pcard .ph-short{font-size:11px;color:var(--ink-3);margin-bottom:8px}
+.pcard .ph-desc{margin-bottom:8px;color:var(--ink)}
+.pcard .ph-bullets{margin:0 0 8px;padding:0;list-style:none}
+.pcard .ph-bullets li{font-size:11.5px;color:var(--ink-2);margin-bottom:3px}
+.pcard .ph-bullets li b{color:var(--ink)}
+.pcard .ph-tip-line{padding:8px;background:var(--bg-warn);border-radius:6px;font-size:11px;color:var(--ink-2);line-height:1.55;margin-top:6px}
+.pcard .ph-hist{font-size:10.5px;color:var(--ink-3);margin-top:6px}
+.pcard .ph-exp{position:absolute;top:10px;right:10px;font-size:10px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:999px;font-weight:600}
+
+.actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+.guide{font-size:11.5px;color:var(--ink-3);padding:6px 4px;line-height:1.85}
+.guide b{color:var(--danger);font-weight:600}
+
+footer{margin-top:24px;padding:16px 4px;font-size:11px;color:var(--ink-3);line-height:1.7;border-top:1px solid var(--hairline)}
+footer p{margin:.3em 0}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./"><img class="logo" src="assets/logo.png" alt="">seneca <span class="sub">· 투자 모의주행</span></a>
+  <a class="back-home" href="https://jumpingkoala.com/">← <img class="logo" src="assets/jk-logo.png" alt="">jumpingkoala</a>
+</header>
+<div class="page">
+
+<!-- A. Hero / Quotes -->
+<div class="hero">
+  <h1>seneca · 투자 모의주행 시뮬레이터</h1>
+  <div class="subtitle">11자산 다변량 GBM 몬테카를로 · 250경로 · <b style="color:var(--danger)">하위 10% 시나리오</b>로 손실 면역을 훈련합니다.</div>
+  <div class="quotes" id="quotesBox"></div>
+</div>
+
+<!-- B. Allocation card -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span class="lbl" style="margin:0">자산 배분</span>
+    <button class="btn" id="manualToggle" style="font-size:11px;padding:4px 10px">직접 입력</button>
+  </div>
+  <div class="alloc-presets" id="presetBtns"></div>
+  <div id="presetDesc" style="font-size:11px;color:var(--ink-3);margin-top:2px"></div>
+  <div class="weights" id="weightsBox"></div>
+  <div class="sum-row" id="sumRow" style="display:none"><span>비중 합계</span><span id="sumVal">100%</span></div>
+  <div class="alloc-stats" id="allocStats"></div>
+</div>
+
+<!-- C. Params card -->
+<div class="card">
+  <div class="params">
+    <div>
+      <span class="lbl">투자금: <span class="val" id="s0Lbl"></span></span>
+      <input type="range" id="s0Sl" min="1000000" max="500000000" step="1000000"/>
+    </div>
+    <div>
+      <span class="lbl">기간: <span class="val" id="wLbl"></span></span>
+      <input type="range" id="wSl" min="52" max="520" step="4"/>
+    </div>
+    <div>
+      <button class="btn primary" onclick="rerun()">재시뮬레이션 ↻</button>
+    </div>
+  </div>
+</div>
+
+<!-- D. Chart card -->
+<div class="card">
+  <div class="chart-head">
+    <div class="mode-toggle">
+      <button class="btn active" id="btnFan" onclick="setFanMode()">시나리오 분포</button>
+      <button class="btn danger" id="btnStress" onclick="setStressMode()">스트레스 테스트 시작 →</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="phase-badge" id="phaseBadge" style="display:none"></span>
+      <div class="gear">
+        <button class="gear-btn" id="gearBtn" onclick="toggleGear()" title="시나리오 옵션">⚙</button>
+        <div class="gear-menu" id="gearMenu">
+          <div class="opt danger" data-p="10" onclick="setPercentile(10)"><span class="dot"></span><div><b>하위 10%</b><small>손실 면역 훈련 (기본)</small></div></div>
+          <div class="opt" data-p="50" onclick="setPercentile(50)"><span class="dot"></span><div><b>중앙값</b><small>평균적 경로</small></div></div>
+          <div class="opt" data-p="90" onclick="setPercentile(90)"><span class="dot"></span><div><b>상위 10%</b><small>낙관 시나리오</small></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stress-ctrl" id="stressCtrl">
+    <button class="btn" id="ppBtn" onclick="togglePlay()" style="padding:4px 10px"></button>
+    <span id="sProg"></span>
+    <span class="v" id="sVal"></span>
+  </div>
+  <div class="prog-wrap" id="progWrap"><div class="prog-fill" id="progFill"></div></div>
+  <svg id="mainChart" viewBox="0 0 700 280"></svg>
+  <div class="stat-row" id="statRow"></div>
+  <div class="sigma-help" id="sigmaHelp"></div>
+  <div id="dpPanel"></div>
+</div>
+
+<div id="resultPanel" class="card result" style="display:none"></div>
+
+<div class="guide" id="guide">
+  파라미터 설정 후 <b>스트레스 테스트 시작</b>을 누르면 하위 10% 시나리오가 주 단위로 전개됩니다. -5%마다 결정의 순간이 등장하고, <b style="color:var(--ink-2)">존버·물타기·손절</b> 중 선택해 그 결정이 어떻게 되돌아오는지 확인하세요.
+</div>
+
+<footer>
+  <p><b>면책</b> — 본 시뮬레이터는 교육·심리훈련 목적이며 투자 자문이 아닙니다. 실제 미래 수익률은 본 모델과 크게 다를 수 있습니다 (특히 비트코인은 GBM이 fat-tail를 과소평가).</p>
+  <p><b>모델</b> — 11자산 다변량 GBM (주 단위, 250경로). 파라미터는 1990–2024 장기 평균에 근거한 추정치이며, KRW 기준 총수익률입니다. 매 26주 마르코프 전이로 경기 4국면이 진행됩니다. 상세 파라미터는 README 참조.</p>
+  <p>seneca v2 · <a href="https://jumpingkoala.com/">jumpingkoala</a></p>
+</footer>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA: assets, μ, σ, correlation matrix
+   ============================================================ */
+const ASSETS = [
+  {key:'sp500',  name:'S&P500',     short:'SP',  cat:'주식', mu:0.10,  sig:0.18},
+  {key:'ndx',    name:'NASDAQ100',  short:'NDX', cat:'주식', mu:0.13,  sig:0.24},
+  {key:'kr',     name:'한국주식',    short:'KR',  cat:'주식', mu:0.07,  sig:0.22},
+  {key:'dev',    name:'선진국',      short:'DEV', cat:'주식', mu:0.06,  sig:0.18},
+  {key:'em',     name:'신흥국',      short:'EM',  cat:'주식', mu:0.08,  sig:0.23},
+  {key:'krb',    name:'한국채(3y)',  short:'KRB', cat:'채권', mu:0.034, sig:0.03},
+  {key:'usb',    name:'미국채(10y)', short:'USB', cat:'채권', mu:0.045, sig:0.10},
+  {key:'gold',   name:'금',          short:'AU',  cat:'대안', mu:0.07,  sig:0.17},
+  {key:'usd',    name:'달러',        short:'USD', cat:'통화', mu:0.012, sig:0.10},
+  {key:'krw',    name:'원화 현금',    short:'KRW', cat:'현금', mu:0.025, sig:0.001},
+  {key:'btc',    name:'비트코인',     short:'BTC', cat:'대안', mu:0.45,  sig:0.75}
+];
+const N=ASSETS.length;
+
+/* Correlation matrix (rough stylized facts; PD-validated below) */
+const RHO=[
+  /*       SP    NDX   KR    DEV   EM    KRB   USB   AU    USD   KRW   BTC */
+  /*SP */[ 1.00, 0.90, 0.55, 0.85, 0.65, 0.00,-0.05, 0.10,-0.30, 0.00, 0.30],
+  /*NDX*/[ 0.90, 1.00, 0.55, 0.80, 0.65, 0.00,-0.10, 0.10,-0.30, 0.00, 0.40],
+  /*KR */[ 0.55, 0.55, 1.00, 0.65, 0.75,-0.10,-0.05, 0.05,-0.40, 0.00, 0.30],
+  /*DEV*/[ 0.85, 0.80, 0.65, 1.00, 0.75, 0.00,-0.05, 0.10,-0.30, 0.00, 0.30],
+  /*EM */[ 0.65, 0.65, 0.75, 0.75, 1.00, 0.00,-0.10, 0.20,-0.40, 0.00, 0.40],
+  /*KRB*/[ 0.00, 0.00,-0.10, 0.00, 0.00, 1.00, 0.40, 0.10,-0.10, 0.05, 0.00],
+  /*USB*/[-0.05,-0.10,-0.05,-0.05,-0.10, 0.40, 1.00, 0.20, 0.10, 0.00, 0.05],
+  /*AU */[ 0.10, 0.10, 0.05, 0.10, 0.20, 0.10, 0.20, 1.00,-0.30, 0.00, 0.20],
+  /*USD*/[-0.30,-0.30,-0.40,-0.30,-0.40,-0.10, 0.10,-0.30, 1.00, 0.00,-0.10],
+  /*KRW*/[ 0.00, 0.00, 0.00, 0.00, 0.00, 0.05, 0.00, 0.00, 0.00, 1.00, 0.00],
+  /*BTC*/[ 0.30, 0.40, 0.30, 0.30, 0.40, 0.00, 0.05, 0.20,-0.10, 0.00, 1.00]
+];
+
+/* ============================================================
+   QUOTES — premeditatio malorum / antifragility / tail risk
+   ============================================================ */
+const QUOTES=[
+  {en:'We suffer more often in imagination than in reality.',
+   kr:'우리는 현실보다 상상 속에서 더 많이 고통받는다. 미리 한 번 겪어 보면 두려움은 작아진다.',
+   author:'Seneca', source:'Letters from a Stoic, 13.4', tone:'a'},
+  {en:'He who fears he shall suffer, already suffers what he fears.',
+   kr:'고통받을까 두려워하는 자는, 이미 그 두려움 자체로 고통받고 있다.',
+   author:'Seneca', source:'On the Tranquility of the Mind', tone:'a'},
+  {en:'Misfortune weighs most heavily on those who expect nothing but good fortune.',
+   kr:'불행은 행운만을 기대해 온 자에게 가장 무겁게 떨어진다.',
+   author:'Seneca', source:'Letters, 91', tone:'a'},
+  {en:'It is in times of security that the spirit should be preparing itself for difficult times.',
+   kr:'평온할 때야말로 정신은 어려운 시기를 대비해야 한다.',
+   author:'Seneca', source:'Letters, 18.5', tone:'a'},
+  {en:'Nothing happens to the wise man against his expectation.',
+   kr:'현인에게는 그가 예상하지 못한 일이 일어나지 않는다 — 미리 그려본 자에게 충격은 줄어든다.',
+   author:'Seneca', source:'Letters, 91.4', tone:'a'},
+  {en:'Hardships often prepare ordinary people for an extraordinary destiny.',
+   kr:'고난은 평범한 자를 비범한 운명으로 단련시킨다. 한 번도 흔들리지 않은 손에는 큰 칼을 맡길 수 없다.',
+   author:'C. S. Lewis', source:'(after Seneca)', tone:'a'},
+  {en:'Begin each day by telling yourself: today I shall meet with interference, ingratitude, insolence, disloyalty, ill-will, and selfishness.',
+   kr:'매일 아침 다짐하라 — 오늘 나는 방해·배은망덕·오만·배신·악의를 만날 것이다. 미리 그려본 자에게 충격은 줄어든다.',
+   author:'Marcus Aurelius', source:'Meditations, 2.1', tone:'a'},
+
+  {en:"The hidden risks of being wrong outweigh the rewards of being right. Don't cross a river if it is, on average, 4 feet deep.",
+   kr:'평균 수심 1.2m 강도 깊은 한 곳에서 익사한다. 폭락은 평균이 아니라 꼬리에서 결판난다.',
+   author:'Nassim Taleb', source:'Antifragile, 2012', tone:'b'},
+  {en:'A turkey is fed for a thousand days. Then on Wednesday afternoon, something unexpected happens to the turkey.',
+   kr:'천 일 동안 매일 먹이를 받아온 칠면조는 천일째 추수감사절에서야 진실을 안다. 과거의 안정은 미래의 안전을 보장하지 않는다.',
+   author:'Nassim Taleb', source:'The Black Swan, 2007', tone:'b'},
+  {en:'We have been fragilizing the economy, our health, education — almost everything — by suppressing randomness and volatility.',
+   kr:'변동성을 억누르려는 모든 시도가 시스템을 더욱 취약하게 만든다. 작은 흔들림은 큰 붕괴를 막는 백신이다.',
+   author:'Nassim Taleb', source:'Antifragile, 2012', tone:'b'},
+  {en:'The fragile wants tranquility, the antifragile grows from disorder, and the robust does not really care.',
+   kr:'연약한 것은 평온을 원하고, 안티프래자일은 혼돈에서 성장한다. 폭락을 견디는 게 아니라 폭락에서 더 강해지는 포트폴리오를 만들어라.',
+   author:'Nassim Taleb', source:'Antifragile, 2012', tone:'b'},
+
+  {en:"Risk comes from not knowing what you're doing.",
+   kr:'위험은 자신이 무엇을 하고 있는지 모를 때 온다. 한 번도 폭락을 겪어보지 않은 자에게 폭락은 가장 위험하다.',
+   author:'Warren Buffett', source:'1993 Letter to Shareholders', tone:'b'},
+  {en:'Be fearful when others are greedy, and greedy when others are fearful.',
+   kr:'남들이 탐욕스러울 때 두려워하고, 남들이 두려워할 때 탐욕스러워야 한다 — 그러나 그 순간이 오면 대부분은 반대로 행동한다.',
+   author:'Warren Buffett', source:'2004 Letter to Shareholders', tone:'b'},
+  {en:'Invert, always invert. Tell me where I\'m going to die — that is, so I don\'t go there.',
+   kr:'뒤집어 보라 — 어떻게 부자가 될까가 아니라, 어떻게 망할까를 먼저 묻는다. 피해야 할 시나리오가 추구해야 할 시나리오보다 명확하다.',
+   author:'Charlie Munger', source:'(quoting Carl Jacobi)', tone:'b'},
+  {en:'The market can remain irrational longer than you can remain solvent.',
+   kr:'시장은 당신이 버틸 수 있는 것보다 더 오래 비합리적일 수 있다. 옳다고 생각하는 베팅도 시간을 견디지 못하면 패배한다.',
+   author:'John Maynard Keynes', source:'(attributed)', tone:'b'},
+  {en:'Bull markets are born on pessimism, grow on skepticism, mature on optimism, and die on euphoria.',
+   kr:'강세장은 비관 위에서 태어나, 회의 위에서 자라고, 낙관 위에서 성숙하며, 도취 위에서 죽는다.',
+   author:'John Templeton', source:'(attributed)', tone:'b'}
+];
+
+function renderQuote(){
+  const q=QUOTES[Math.floor(Math.random()*QUOTES.length)];
+  const el=document.getElementById('quotesBox');
+  el.innerHTML=`<div class="quote ${q.tone==='b'?'s2':''}">
+    <button class="reroll" onclick="renderQuote()" title="다른 명언 보기">↻</button>
+    <div class="q">"${q.en}"</div>
+    <div class="q-kr">${q.kr}</div>
+    <div class="src"><span class="author">— ${q.author}</span><span>${q.source}</span></div>
+  </div>`;
+}
+
+/* ============================================================
+   PHASES — Bridgewater-style 4-quadrant macro
+   ============================================================ */
+const PHASES=['회복기','확장기','호황기','침체기'];
+const PHASE_INFO={
+  '회복기':{
+    icon:'🌱', col:'#1D9E75',
+    short:'성장 회복 + 물가 안정',
+    description:'경기 침체 끝물에서 막 벗어나는 국면. 중앙은행은 여전히 완화적이고, 기업 실적은 바닥을 다지며 반등한다. 위험자산 회복이 가장 빠른 시기.',
+    historical:'2009년 3월~2010년 (글로벌 금융위기 직후), 2020년 4~6월 (코로나 충격 직후)',
+    winners:'신흥국 주식, 한국 성장주, 회사채, 비트코인',
+    losers:'금, USD, 방어주',
+    investorTip:'저점에서 매도하는 투자자가 가장 많은 시기. 뉴스는 여전히 어둡지만 시장은 먼저 움직인다.'
+  },
+  '확장기':{
+    icon:'☀️', col:'#1d4ed8',
+    short:'안정 성장 + 낮은 인플레',
+    description:'경기가 본격적으로 확장하는 가장 이상적인 국면. 실업률 하락, 기업 이익 증가, 인플레는 통제됨. 주가는 꾸준히 상승하며 변동성도 낮다.',
+    historical:'2013~2015 (테이퍼 탠트럼 후 안정기), 2017 (Goldilocks 정점)',
+    winners:'S&P500, 나스닥, 선진국 주식, 가치주',
+    losers:'금, 안전자산',
+    investorTip:'가장 위험한 국면 — 변동성이 낮아 레버리지·집중투자 유혹이 커진다. "이번엔 다르다"의 함정.'
+  },
+  '호황기':{
+    icon:'🔥', col:'#BA7517',
+    short:'성장 정점 + 인플레 가속',
+    description:'경기 사이클의 후반부. 인플레가 가속되며 중앙은행이 긴축으로 전환. 금리 상승이 자산 가격을 압박하기 시작한다. 단기 강세지만 균열이 보이는 국면.',
+    historical:'2007년 (금융위기 직전), 2021년 말 (인플레 급등기), 1999년 말 (닷컴 정점)',
+    winners:'금, 원자재, 신흥국(초기), 단기 채권',
+    losers:'장기 채권, 성장주, 부동산',
+    investorTip:'"파티가 늦게까지 가지만 마지막엔 누구도 빠져나오지 못한다"(Chuck Prince, 2007). 하락 전조를 무시하지 말 것.'
+  },
+  '침체기':{
+    icon:'❄️', col:'#a8392c',
+    short:'성장 둔화 + 신용 위축',
+    description:'GDP 역성장, 실업률 급등, 기업 디폴트 증가. 위험자산이 일제히 무너지며 안전자산(미국채·금·USD)으로 자금이 도피. 본 시뮬레이션의 핵심 학습 구간.',
+    historical:'2008년 9~12월 (리먼 파산), 2020년 3월 (코로나 록다운), 2022년 (인플레+긴축)',
+    winners:'미국채, 금, USD, 원화 (한국 외 자산 기준), 방어주',
+    losers:'거의 모든 주식, 회사채, 비트코인, 신흥국 통화',
+    investorTip:'평생 한 번 올까 말까 한 매수 기회가 침체 후반부에 등장. 그러나 대부분은 이 시점에서 매도해 영구적 손실을 확정 — 손실 면역 훈련의 핵심 시나리오.'
+  }
+};
+
+/* ============================================================
+   NEWS — 11자산 × 4국면 × 5건. 모두 해당 자산의 부진/위협 시나리오.
+   ============================================================ */
+const NEWS={
+  'S&P500':{
+    '회복기':[
+      '📰 "美 신규 실업수당 청구 급증 — 경기회복 둔화 신호 우려"',
+      '📰 "S&P500 어닝 시즌 부진, 5개 분기 연속 EPS 역성장"',
+      '📰 "美 소비자신뢰지수 6년 최저, 소매판매 -1.2%"',
+      '📰 "Fed 추가 완화 시사에도 시장 반응 차가워"',
+      '📰 "기술주 어닝 미스 행렬, 빅테크 시총 1조달러 증발"'
+    ],
+    '확장기':[
+      '📰 "S&P500 PER 22배 돌파 — 1999년 이후 최고치 우려"',
+      '📰 "월가 거품론 재부상, 경고음에도 ‘FOMO’ 매수세"',
+      '📰 "美 개인투자자 신용잔고 사상 최대 — 청산 리스크 경고"',
+      '📰 "구겐하임 ‘올해 안 -25% 폭락’ 전망 보고서"',
+      '📰 "VIX 한 달 만에 두 배, 변동성 매도 청산 행렬"'
+    ],
+    '호황기':[
+      '📰 "Fed 자이언트 스텝 시사 — 75bp 인상 우세"',
+      '📰 "10년물 금리 5% 돌파 임박, 주식 자금이탈 가속"',
+      '📰 "에너지·식료품 인플레 확산, 마진 압박에 IT주 급락"',
+      '📰 "월가 ‘하드랜딩 시나리오 60%’ — 2분기 만에 전망 급변"',
+      '📰 "S&P 어닝 가이던스 일제 하향, 이익률 둔화 신호"'
+    ],
+    '침체기':[
+      '📰 "美 GDP 2분기 연속 역성장 — 공식 침체 진입"',
+      '📰 "S&P500 -25% 진입, 1973년 이후 최악의 약세장 행보"',
+      '📰 "주요 IB 일제히 EPS 하향 — 어닝 추정치 -18%"',
+      '📰 "신용 스프레드 800bp 돌파, 회사채 시장 마비"',
+      '📰 "대형 IB 두 곳 파산설, 시스템 리스크 우려 확산"'
+    ]
+  },
+  'NASDAQ100':{
+    '회복기':[
+      '📰 "빅테크 어닝 미스 행렬, 클라우드 성장률 한 자릿수"',
+      '📰 "AI 투자 ROI 회의론 확산 — 캐펙스 부담 부각"',
+      '📰 "테크주 자사주매입 둔화, 현금흐름 둔화 신호"',
+      '📰 "엔비디아 가이던스 컨센서스 하회, 반도체 주가 -10%"',
+      '📰 "MAGS 7 종목 중 4개 분기 연속 매출 둔화"'
+    ],
+    '확장기':[
+      '📰 "나스닥 PER 35배 — 닷컴버블 직전 수준 경고"',
+      '📰 "AI 거품론 재점화, 대형 헤지펀드 숏 포지션 확대"',
+      '📰 "美 SEC, 빅테크 회계감사 강화 발표"',
+      '📰 "테크주 인사이더 매도 사상 최대 — 임원진 ‘차익실현’"',
+      '📰 "ARM·OpenAI IPO 후속 청약 미달, 테크 IPO 빙하기 신호"'
+    ],
+    '호황기':[
+      '📰 "고금리 장기화에 성장주 듀레이션 압박 본격화"',
+      '📰 "엔비디아 하루 -8%, AI 모멘텀 약화 우려"',
+      '📰 "美 대형 클라우드 캐펙스 동반 축소 — 경기 둔화 시그널"',
+      '📰 "中 반도체 자립 가속, 美 칩스법 무력화 우려"',
+      '📰 "EU 빅테크 과징금 수십억 유로 부과 가능성"'
+    ],
+    '침체기':[
+      '📰 "나스닥 -35% 진입, 2000년 닷컴 붕괴 데자뷔"',
+      '📰 "테크 정리해고 50만 명 돌파, 광고매출 절벽"',
+      '📰 "AI 인프라 과잉 투자 후폭풍 — GPU 재고 폭증"',
+      '📰 "메타·구글 광고매출 두 자릿수 역성장"',
+      '📰 "대형 SaaS ARR 첫 마이너스, 멀티플 1/3 토막"'
+    ]
+  },
+  '한국주식':{
+    '회복기':[
+      '📰 "외국인 5거래일 연속 순매도 — 한국 회복 의구심"',
+      '📰 "삼성전자 어닝 가이던스 하회, IT 사이클 회복 지연"',
+      '📰 "KOSPI 박스권 재진입 — ‘5년째 횡보’ 한탄"',
+      '📰 "원/달러 1,400원 재돌파, 외국인 자금이탈 가속"',
+      '📰 "한국 기업 부채 비율 사상 최대, 금리 인하 기대 약화"'
+    ],
+    '확장기':[
+      '📰 "KOSPI 코리아 디스카운트 재부상 — 외국인 매도 전환"',
+      '📰 "지정학 리스크 재점화, MSCI 한국 비중 축소"',
+      '📰 "금융위 ‘공매도 재개’ 발표, 개인 반발 격화"',
+      '📰 "삼성전자 HBM 점유율 SK하이닉스에 추월당해"',
+      '📰 "한국 부동산 PF 부실 우려 재점화 — 금융주 직격"'
+    ],
+    '호황기':[
+      '📰 "원자재 가격 급등에 한국 수출 마진 압박"',
+      '📰 "한국은행 빅스텝 시사 — 금리 4% 시대 임박"',
+      '📰 "원/달러 1,450원 돌파, 외국인 환차손 우려"',
+      '📰 "中 경기 둔화 직격, 한국 화학·철강주 급락"',
+      '📰 "삼성전자 분기 영업이익 4조 하회 — 메모리 단가 하락"'
+    ],
+    '침체기':[
+      '📰 "KOSPI 2,000선 붕괴 — IMF·금융위기 이후 최악"',
+      '📰 "외국인 한 달 만에 8조 순매도, 환율 1,500원 위협"',
+      '📰 "한국 GDP 분기 -1.5%, 25년 만의 역성장"',
+      '📰 "건설사 줄도산 시작 — 부동산 PF 200조 위기설"',
+      '📰 "삼성전자 영업이익 적자 전환, 반도체 -50% 추락"'
+    ]
+  },
+  '선진국':{
+    '회복기':[
+      '📰 "유럽 PMI 50선 회복 실패 — 회복 페이스 지지부진"',
+      '📰 "독일 산업생산 -2%, 유럽 회복 동력 약화"',
+      '📰 "일본 엔화 약세에도 수출 회복 더뎌"',
+      '📰 "ECB 추가 완화 신호에도 EUR 약세, 유럽 주식 외면"',
+      '📰 "선진국 ETF 자금 유출 4주 연속, 신흥국으로 머니 무브"'
+    ],
+    '확장기':[
+      '📰 "유럽 은행주 거품 경고 — Tier1 자본 우려"',
+      '📰 "일본 주가 PBR 1배 캠페인 한계론 부상"',
+      '📰 "ECB 금리 인상 시사, 채권·주식 동반 약세"',
+      '📰 "FTSE 100 8년 만에 사상 최고 — 차익실현 압박"',
+      '📰 "일본 엔화 강세 전환, 수출주 마진 압박"'
+    ],
+    '호황기':[
+      '📰 "유럽 인플레 두 자릿수 — ECB 자이언트 스텝"',
+      '📰 "에너지 위기 재점화, 유럽 산업주 직격탄"',
+      '📰 "독일 침체 우려, DAX -7% 단기 급락"',
+      '📰 "BOJ YCC 폐기 시사 — 일본 채권·주식 동반 흔들"',
+      '📰 "EU 탄소세 강화, 제조업·운송주 마진 압박"'
+    ],
+    '침체기':[
+      '📰 "유로존 GDP -1%, 2009년 이후 최악의 침체"',
+      '📰 "독일 디폴트 우려 확산, 분트 스프레드 급등"',
+      '📰 "일본 엔/달러 160원 돌파, 자본도피 우려"',
+      '📰 "FTSE 100 -30% 진입, 영국 모기지 시장 위기"',
+      '📰 "유럽 대형은행 두 곳 신용등급 강등 — 시스템 리스크"'
+    ]
+  },
+  '신흥국':{
+    '회복기':[
+      '📰 "中 경기부양책 효과 의구심, MSCI EM 횡보"',
+      '📰 "신흥국 통화 동반 약세 — 달러 강세 압력"',
+      '📰 "EM ETF 자금 유출, 캐리트레이드 청산 행렬"',
+      '📰 "브라질·튀르키예 정책 불안, EM 변동성 재점화"',
+      '📰 "中 부동산 디폴트 잔불 — 헝다 후속 부도 우려"'
+    ],
+    '확장기':[
+      '📰 "中 美 갈등 격화, 中 ETF 일제히 -8%"',
+      '📰 "신흥국 외환보유고 감소, 달러 자금 이탈 가속"',
+      '📰 "MSCI 中 비중 축소 검토 — 인덱스 펀드 매도 폭주"',
+      '📰 "인도 증시 PER 30배, 거품 경고음"',
+      '📰 "남미 정치 불안 재점화, 통화 -15% 폭락"'
+    ],
+    '호황기':[
+      '📰 "강달러에 EM 통화 일제히 폭락, 헤알 -20%"',
+      '📰 "中 위안화 약세 가속 — 자본 통제 강화"',
+      '📰 "튀르키예 외환보유 -50%, IMF 구제금융설"',
+      '📰 "EM 회사채 디폴트율 6%, 2008년 이후 최고"',
+      '📰 "원자재 가격 급등에도 EM 주식 외면 — 통화 약세"'
+    ],
+    '침체기':[
+      '📰 "신흥국 디폴트 도미노, IMF 긴급 구제 검토"',
+      '📰 "MSCI EM -40% 진입, 2008년 이후 최악"',
+      '📰 "中 GDP 2% 미달, 디플레이션 진입 공식화"',
+      '📰 "EM 통화 평균 -25%, 캐리트레이드 전면 청산"',
+      '📰 "남미·아프리카 채권 디폴트 연쇄 — 신흥국 위기"'
+    ]
+  },
+  '한국채(3y)':{
+    '회복기':[
+      '📰 "회복 기대로 금리 상승 — 한국채 가격 -1.5%"',
+      '📰 "기재부 국고채 발행 확대, 수급 부담"',
+      '📰 "한은 금리 인하 사이클 종료 시사"',
+      '📰 "외국인 원화채 보유 축소 — 국채 수익률 상승"',
+      '📰 "신용 스프레드 정상화, 회사채 매력 회복"'
+    ],
+    '확장기':[
+      '📰 "한은 금리 인상 시사 — 국채 수익률 4% 돌파"',
+      '📰 "원화채 외국인 매도, 국고채 가격 하락"',
+      '📰 "물가 목표 상회 우려에 국채 약세"',
+      '📰 "기재부 추경 편성으로 국채 발행 급증"',
+      '📰 "한국 신용등급 전망 ‘부정적’ 조정 검토"'
+    ],
+    '호황기':[
+      '📰 "한국 인플레 4% 돌파, 한은 빅스텝 결정"',
+      '📰 "국고 3년물 5% 돌파 — 2008년 이후 최고"',
+      '📰 "원화 약세에 외국인 채권자금 이탈 가속"',
+      '📰 "한국 신용부도스왑(CDS) 프리미엄 두 배"',
+      '📰 "단기 자금시장 경색 — CP 금리 6% 돌파"'
+    ],
+    '침체기':[
+      '📰 "한국 신용등급 강등 검토 — 국채 디폴트 우려는 일축"',
+      '📰 "환율 급등에 외국인 원화채 매도 폭주"',
+      '📰 "한국은행 양적완화 검토 — 국채 시장 변동성 폭증"',
+      '📰 "회사채 시장 마비 — 우량등급도 차환 곤란"',
+      '📰 "PF 디폴트 도미노로 정부보증채 신뢰 흔들"'
+    ]
+  },
+  '미국채(10y)':{
+    '회복기':[
+      '📰 "美 경기 회복에 10년물 금리 4.5% 돌파"',
+      '📰 "Fed 양적긴축(QT) 가속 — 채권 수급 부담"',
+      '📰 "美 재무부 국채 발행 사상 최대, 수익률 상승"',
+      '📰 "외국인 美 국채 보유 축소 — 中 매도 가속"',
+      '📰 "회복 기대로 채권 자금 주식으로 머니 무브"'
+    ],
+    '확장기':[
+      '📰 "美 10년물 5% 돌파, 채권펀드 -8% 손실"',
+      '📰 "美 재정적자 GDP의 7%, 신용등급 강등 우려"',
+      '📰 "Fed 인상 사이클 재개 시사 — 채권 일제히 약세"',
+      '📰 "TIPS 실질금리 2.5%, 채권시장 ‘구조적 약세’ 진단"',
+      '📰 "中·日 외국인 美 국채 보유 사상 최저"'
+    ],
+    '호황기':[
+      '📰 "美 인플레 8%, 10년물 6% 돌파 — 1980년대 재현 우려"',
+      '📰 "Fed 100bp 인상 시사 — 채권 가격 폭락"',
+      '📰 "美 신용등급 AAA → AA+ 강등 (S&P)"',
+      '📰 "장단기 금리 역전 -150bp, 사상 최대 폭"',
+      '📰 "재무부 채권 입찰 첫 미달 — 외국인 외면"'
+    ],
+    '침체기':[
+      '📰 "美 침체 진입했지만 인플레 잔존 — 채권 변동성 폭증"',
+      '📰 "美 재무부 단기차환 곤란설 — 디폴트 시나리오 헤드라인 점령"',
+      '📰 "Fed 갈팡질팡 — 인하 vs 추가 긴축 놓고 분열"',
+      '📰 "채권 ETF 자금 유출 사상 최대, 유동성 경색"',
+      '📰 "신흥국 자금 도피로 美 국채 일시 강세 후 급락 반복"'
+    ]
+  },
+  '금':{
+    '회복기':[
+      '📰 "위험자산 선호 회복 — 금 -8% 단기 조정"',
+      '📰 "Fed 완화 종료 시사, 금 ETF 자금 유출"',
+      '📰 "달러 강세에 금 가격 압박 — 단기 매도세"',
+      '📰 "中 인민은행 금 매입 둔화 — 수급 약화"',
+      '📰 "美 실질금리 상승, 금 매력도 약화"'
+    ],
+    '확장기':[
+      '📰 "금 ETF 자금 7개월 연속 유출 — 안전자산 외면"',
+      '📰 "美 실질금리 2% 돌파 — 무이자 자산 금 외면"',
+      '📰 "中 결혼시즌 수요 부진, 금값 -5%"',
+      '📰 "달러 강세 지속에 금/달러 비율 약세"',
+      '📰 "비트코인이 금 대체재 부상 — 금 시장 위협"'
+    ],
+    '호황기':[
+      '📰 "강달러 + 고금리에 금 한 달 -10% 폭락"',
+      '📰 "금 채굴기업 수익성 악화, 광산주 -20%"',
+      '📰 "Fed 매파 발언에 금 단기 -7% 급락"',
+      '📰 "中·인도 수요 둔화로 금 수급 약세"',
+      '📰 "금 ETF 보유잔액 5년 최저, 이탈 가속"'
+    ],
+    '침체기':[
+      '📰 "패닉 매도에 금까지 동반 하락 — 마진콜 청산"',
+      '📰 "달러 강세 슈퍼사이클로 금 -15% 단기 폭락"',
+      '📰 "中 인민은행 금 매도 전환설, 수급 흔들"',
+      '📰 "유동성 위기에 안전자산 모두 동반 매도"',
+      '📰 "금 선물 미결제약정 청산 — 수급 일시 붕괴"'
+    ]
+  },
+  '달러':{
+    '회복기':[
+      '📰 "위험자산 선호로 달러 인덱스 5% 하락"',
+      '📰 "Fed 완화 지속에 달러 약세 가속"',
+      '📰 "원/달러 1,200원선 위협 — 수출주 직격탄"',
+      '📰 "中 위안화 강세 전환 — 달러 약세 동조"',
+      '📰 "글로벌 자금 신흥국 회귀 — 달러 매도 행렬"'
+    ],
+    '확장기':[
+      '📰 "달러 인덱스 100선 붕괴 — 글로벌 약달러 추세"',
+      '📰 "유로 강세 가속 — EUR/USD 1.20 돌파"',
+      '📰 "원/달러 1,150원, 외국인 환차손 우려"',
+      '📰 "美 무역적자 사상 최대, 달러 신뢰 약화"',
+      '📰 "BRICS 통화 결제 확대, 달러 패권 약화 우려"'
+    ],
+    '호황기':[
+      '📰 "달러 인덱스 110 돌파했으나 정점론 부상"',
+      '📰 "Fed 인상 마무리 시사로 달러 단기 약세"',
+      '📰 "美 부채한도 협상 결렬 우려 — 달러 신뢰 흔들"',
+      '📰 "엔/달러 강제 개입, 달러 단기 급락"',
+      '📰 "유럽 자금 美 국채 회귀 — 달러 단기 약세 후 반등"'
+    ],
+    '침체기':[
+      '📰 "Fed 긴급 인하 — 달러 약세 전환"',
+      '📰 "美 침체 직격탄, 달러 인덱스 -8% 한 달"',
+      '📰 "달러 패권 약화 우려, 위안화 결제 비중 사상 최대"',
+      '📰 "달러 표시 EM 채권 디폴트 도미노 — 안전 무용지물"',
+      '📰 "美 부채한도 디폴트 위협 — 달러 신뢰 일시 붕괴"'
+    ]
+  },
+  '원화 현금':{
+    '회복기':[
+      '📰 "한은 추가 인하 시사 — 예금금리 2% 붕괴"',
+      '📰 "물가 슬금슬금 상승, 실질금리 마이너스 진입"',
+      '📰 "원화 약세 지속, 해외자산 매력 부상"',
+      '📰 "예금자보호 한도 미흡 우려 재점화"',
+      '📰 "회복기 위험자산 강세 — 현금 보유 기회비용 급증"'
+    ],
+    '확장기':[
+      '📰 "원/달러 약세 가속 — 원화 보유 환차손 누적"',
+      '📰 "물가 3% 돌파, 원화 실질구매력 잠식 본격화"',
+      '📰 "주식·부동산 강세 속 현금 보유자 한숨"',
+      '📰 "한은 ‘저금리 장기화’ 시사 — 예금 매력 추가 약화"',
+      '📰 "MMF 자금 유출 가속 — 위험자산으로 머니 무브"'
+    ],
+    '호황기':[
+      '📰 "한국 인플레 5% — 원화 실질가치 -3% 잠식"',
+      '📰 "원/달러 1,450원, 원화 보유자 해외 대비 손실"',
+      '📰 "고금리에도 물가가 더 올라 — 실질금리 마이너스"',
+      '📰 "기축통화 대비 원화 신뢰 흔들 — 자본 도피"',
+      '📰 "정기예금 6% 가입자, 인플레 7%에 실질 마이너스"'
+    ],
+    '침체기':[
+      '📰 "원화 표시 자산 신뢰 흔들 — 환율 1,500원 돌파"',
+      '📰 "한국 신용등급 전망 ‘부정적’ — 원화 약세 가속"',
+      '📰 "한은 양적완화 검토 — 원화 가치 추가 절하 우려"',
+      '📰 "외국인 원화 매도 폭주 — 자본도피 가속"',
+      '📰 "예금자보호 한도 인상 논의 — 원화 자산 신뢰 위기"'
+    ]
+  },
+  '비트코인':{
+    '회복기':[
+      '📰 "비트코인 -25% 폭락, 대형 거래소 출금 지연 사태"',
+      '📰 "코인베이스 적자 전환, 한국 거래소 줄도산 우려"',
+      '📰 "美 SEC 비트코인 ETF 환매 검토 — 자금 이탈 가속"',
+      '📰 "마운트곡스 청산 채권 28만 BTC 시장 출회 임박"',
+      '📰 "회복기에도 비트코인 외면 — 디지털 골드 명분 약화"'
+    ],
+    '확장기':[
+      '📰 "美 SEC 주요 거래소 추가 제소 — 규제 그림자 확산"',
+      '📰 "비트코인 채굴 난이도 사상 최대 — 채굴자 수익성 악화"',
+      '📰 "고래 지갑 대규모 이체 — 매도 압력 우려"',
+      '📰 "中 마이닝 단속 재점화, 해시레이트 -20%"',
+      '📰 "스테이블코인 USDT 신뢰 흔들 — 디페그 우려"'
+    ],
+    '호황기':[
+      '📰 "강달러 + 고금리에 위험자산 회피, 비트코인 -30%"',
+      '📰 "美 SEC 거래소 폐쇄 명령 — 한국 거래소도 직격"',
+      '📰 "테더 디페그 우려 재점화, 시장 패닉"',
+      '📰 "비트코인 ETF 자금 유출 사상 최대 — 한 주 30억달러"',
+      '📰 "Fed 매파 발언에 비트코인 -15% 단기 급락"'
+    ],
+    '침체기':[
+      '📰 "암호화폐 시총 1조달러 붕괴 — 헤지펀드 청산 폭주"',
+      '📰 "스테이블코인 디페그, 패닉 셀 전염"',
+      '📰 "주요 거래소 파산 신청 — 한국 투자자 출금 동결"',
+      '📰 "비트코인 -65% 폭락, 2018년 이후 최악의 약세장"',
+      '📰 "FTX 사태 재현 우려 — 거래소 줄도산 도미노"'
+    ]
+  }
+};
+
+/* ============================================================
+   MATH HELPERS
+   ============================================================ */
+const randn=()=>{const u=Math.random()||1e-10,v=Math.random()||1e-10;return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+function cholesky(A){
+  const n=A.length, L=Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++){
+    for(let j=0;j<=i;j++){
+      let s=0;
+      for(let k=0;k<j;k++) s += L[i][k]*L[j][k];
+      if(i===j){
+        const v=A[i][i]-s;
+        if(v<=1e-12) return null;
+        L[i][j]=Math.sqrt(v);
+      } else {
+        L[i][j]=(A[i][j]-s)/L[j][j];
+      }
+    }
+  }
+  return L;
+}
+function ensurePD(M){
+  let A=M.map(r=>r.slice());
+  for(let tries=0;tries<8;tries++){
+    const L=cholesky(A);
+    if(L) return {L, jitter:tries*1e-3};
+    for(let i=0;i<A.length;i++) A[i][i]+=1e-3;
+  }
+  return {L:cholesky(A), jitter:0.008};
+}
+const {L:CHOL_L, jitter:CHOL_JIT}=ensurePD(RHO);
+if(CHOL_JIT>0) console.warn(`[seneca] correlation matrix needed PD jitter +${CHOL_JIT}`);
+
+const fw=n=>{const a=Math.abs(n);if(a>=1e8)return(n/1e8).toFixed(2)+'억';if(a>=1e4)return Math.round(n/1e4).toLocaleString()+'만';return Math.round(n).toLocaleString();};
+const fwRaw=n=>fw(n)+'원';
+const fp=r=>(r>=0?'+':'')+(r*100).toFixed(1)+'%';
+const fpct=v=>(v*100).toFixed(0)+'%';
+const pickRand=arr=>arr[Math.floor(Math.random()*arr.length)];
+// week → month-aware label
+const w2mo = w => Math.round(w*12/52);
+const fmLabel = mTotal => {
+  if(mTotal===0) return '시작';
+  if(mTotal%12===0 && mTotal>=12) return (mTotal/12)+'년';
+  if(mTotal<12) return mTotal+'개월';
+  return Math.floor(mTotal/12)+'년 '+(mTotal%12)+'개월';
+};
+const fmW = w => fmLabel(w2mo(w));
+// portfolio mean & sigma (annual) from current weights
+function portMuSigma(){
+  let mu=0, v=0;
+  for(let i=0;i<N;i++) mu += weights[i]*ASSETS[i].mu;
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++) v += weights[i]*weights[j]*RHO[i][j]*ASSETS[i].sig*ASSETS[j].sig;
+  return {mu, sig:Math.sqrt(Math.max(0,v))};
+}
+function sigBoundsAt(yr){
+  const {mu,sig}=portMuSigma();
+  const drift=(mu-0.5*sig*sig)*yr, sd=sig*Math.sqrt(yr);
+  return {up:S0*Math.exp(drift+sd), dn:S0*Math.exp(drift-sd), upR:Math.exp(drift+sd)-1, dnR:Math.exp(drift-sd)-1};
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let weights=new Array(N).fill(0); weights[0]=1; // default S&P500 100%
+let presetKey='SP100', manualMode=false;
+let S0=10000000, weeks=156, targetP=10;
+let sim=null;
+let mode='fan', step=0, playing=false, decisions=[], pendingDP=null, done=false;
+let firedLevels=new Set(), hasSold=false, animTimer=null;
+
+/* ============================================================
+   SIMULATION
+   ============================================================ */
+function runMultiGBM(T, N_PATHS){
+  const dt=1/52;
+  const drift=ASSETS.map(a=>(a.mu-0.5*a.sig*a.sig)*dt);
+  const diff =ASSETS.map(a=>a.sig*Math.sqrt(dt));
+  const portPaths=[], assetPathsAll=[];
+  for(let p=0;p<N_PATHS;p++){
+    const A=Array.from({length:N},()=>[1.0]); // each asset price normalized to 1
+    for(let t=0;t<T;t++){
+      const eps=Array.from({length:N},randn);
+      const z=new Array(N).fill(0);
+      for(let i=0;i<N;i++){
+        let s=0; for(let k=0;k<=i;k++) s+=CHOL_L[i][k]*eps[k];
+        z[i]=s;
+      }
+      for(let i=0;i<N;i++){
+        const prev=A[i][t];
+        A[i].push(prev*Math.exp(drift[i]+diff[i]*z[i]));
+      }
+    }
+    // portfolio path
+    const port=new Array(T+1).fill(0);
+    for(let t=0;t<=T;t++){
+      let v=0; for(let i=0;i<N;i++) v+=weights[i]*A[i][t];
+      port[t]=S0*v;
+    }
+    portPaths.push(port);
+    assetPathsAll.push(A);
+  }
+  return {portPaths, assetPathsAll};
+}
+function calcPcts(paths,T,ps){const r={};ps.forEach(p=>r[p]=[]);for(let t=0;t<=T;t++){const s=paths.map(p=>p[t]).sort((a,b)=>a-b);ps.forEach(p=>r[p].push(s[Math.min(Math.floor(p/100*(s.length-1)),s.length-1)]));}return r;}
+
+function genPhaseSchedule(T){
+  const sched=[];
+  let cur=PHASES[Math.floor(Math.random()*4)];
+  sched.push({startWeek:0, phase:cur});
+  const segLen=26;
+  for(let w=segLen;w<T;w+=segLen){
+    const r=Math.random();
+    let nxt;
+    const idx=PHASES.indexOf(cur);
+    if(r<0.3) nxt=cur;
+    else if(r<0.8){ // adjacent
+      nxt = PHASES[Math.random()<0.5 ? (idx+3)%4 : (idx+1)%4];
+    } else {
+      nxt = PHASES[(idx+2)%4];
+    }
+    if(nxt!==cur){ sched.push({startWeek:w, phase:nxt}); cur=nxt; }
+  }
+  return sched;
+}
+function phaseAt(sched,w){
+  let p=sched[0].phase;
+  for(const seg of sched){ if(seg.startWeek<=w) p=seg.phase; else break; }
+  return p;
+}
+
+function compute(){
+  const {portPaths, assetPathsAll} = runMultiGBM(weeks, 250);
+  const pcts=calcPcts(portPaths,weeks,[5,10,25,50,75,90,95]);
+  const target=pcts[targetP][weeks];
+  let bestIdx=0, bestDist=Math.abs(portPaths[0][weeks]-target);
+  for(let i=1;i<portPaths.length;i++){
+    const d=Math.abs(portPaths[i][weeks]-target);
+    if(d<bestDist){bestDist=d; bestIdx=i;}
+  }
+  const stressPath=portPaths[bestIdx];
+  const stressAssets=assetPathsAll[bestIdx]; // [N][T+1]
+  const phaseSched=genPhaseSchedule(weeks);
+  sim={pcts, stressPath, stressAssets, phaseSched};
+  renderAll();
+}
+
+/* ============================================================
+   ALLOCATION CONTROLS
+   ============================================================ */
+const PRESETS={
+  SP100:  { label:'S&P500 100%',  weights:[1,0,0,0,0,0,0,0,0,0,0], desc:'미국 대형주 단일 집중' },
+  NDX100: { label:'NASDAQ100 100%',weights:[0,1,0,0,0,0,0,0,0,0,0], desc:'미국 기술주 단일 집중' },
+  KR100:  { label:'한국주식 100%', weights:[0,0,1,0,0,0,0,0,0,0,0], desc:'코스피 단일 집중' },
+  BTC100: { label:'비트코인 100%', weights:[0,0,0,0,0,0,0,0,0,0,1], desc:'암호화폐 단일 집중' },
+  DIV:    { label:'분산 (Permanent+)', weights:[0.20,0.05,0.10,0.05,0.10,0.10,0.10,0.20,0.05,0.05,0], desc:'주식 50 / 채권 20 / 금 20 / FX·현금 10' }
+};
+function applyPreset(k){
+  presetKey=k; manualMode=false;
+  weights=PRESETS[k].weights.slice();
+  document.getElementById('weightsBox').classList.remove('show');
+  document.getElementById('sumRow').style.display='none';
+  document.getElementById('manualToggle').textContent='직접 입력';
+  document.querySelectorAll('#presetBtns .btn').forEach(b=>b.classList.toggle('active', b.dataset.k===k));
+  document.getElementById('presetDesc').textContent=PRESETS[k].desc + ' · 비중: ' + weights.map((w,i)=>w>0?`${ASSETS[i].short} ${(w*100).toFixed(0)}`:null).filter(Boolean).join(' / ');
+  refreshWeightsBox();
+  renderAllocStats();
+  compute();
+}
+function refreshWeightsBox(){
+  const box=document.getElementById('weightsBox');
+  box.innerHTML=ASSETS.map((a,i)=>`
+    <div class="w-row">
+      <span class="nm">${a.name}</span>
+      <input type="range" min="0" max="100" step="5" value="${Math.round(weights[i]*100)}" data-i="${i}" oninput="onWeightInput(this)"/>
+      <span class="v" id="wv${i}">${Math.round(weights[i]*100)}</span>
+    </div>`).join('');
+}
+function onWeightInput(el){
+  const i=+el.dataset.i;
+  weights[i]=+el.value/100;
+  document.getElementById('wv'+i).textContent=el.value;
+  updateSumRow();
+  renderAllocStats();
+}
+function updateSumRow(){
+  const sum=weights.reduce((a,b)=>a+b,0);
+  const row=document.getElementById('sumRow'), val=document.getElementById('sumVal');
+  val.textContent=(sum*100).toFixed(0)+'%';
+  if(Math.abs(sum-1)<1e-6){ row.classList.remove('bad'); }
+  else { row.classList.add('bad'); val.textContent=(sum*100).toFixed(0)+'%  (100%로 맞춰주세요)'; }
+}
+function toggleManual(){
+  manualMode=!manualMode;
+  const box=document.getElementById('weightsBox'), sr=document.getElementById('sumRow');
+  if(manualMode){
+    refreshWeightsBox();
+    box.classList.add('show'); sr.style.display='flex';
+    document.getElementById('manualToggle').textContent='접기 ↑';
+    updateSumRow();
+  } else {
+    box.classList.remove('show'); sr.style.display='none';
+    document.getElementById('manualToggle').textContent='직접 입력';
+  }
+}
+function renderAllocStats(){
+  // expected return
+  let expR=0, expV=0;
+  for(let i=0;i<N;i++) expR+=weights[i]*ASSETS[i].mu;
+  // variance using full covariance
+  for(let i=0;i<N;i++){
+    for(let j=0;j<N;j++){
+      expV += weights[i]*weights[j]*RHO[i][j]*ASSETS[i].sig*ASSETS[j].sig;
+    }
+  }
+  const sd=Math.sqrt(Math.max(0,expV));
+  const var99w = -(expR/52 + 2.326*sd/Math.sqrt(52)); // approx 1-week 99% VaR (negative tail)
+  const sharpe=(expR-0.025)/Math.max(sd,1e-6);
+  const el=document.getElementById('allocStats');
+  el.innerHTML=`
+    <div class="alloc-stat"><div class="t">기대수익(연)</div><div class="v" style="color:var(--success)">${fp(expR)}</div></div>
+    <div class="alloc-stat"><div class="t">변동성(연)</div><div class="v" style="color:var(--ink-2)">${fp(sd)}</div></div>
+    <div class="alloc-stat"><div class="t">샤프(rf=2.5%)</div><div class="v" style="color:var(--ink-2)">${sharpe.toFixed(2)}</div></div>
+    <div class="alloc-stat"><div class="t">VaR 1주 99%</div><div class="v" style="color:var(--danger)">${fp(-var99w)}</div></div>`;
+}
+
+/* ============================================================
+   STRESS TEST FLOW
+   ============================================================ */
+function stopAnim(){if(animTimer){clearInterval(animTimer); animTimer=null;}}
+
+function getDrawdown(stepIdx){ return (sim.stressPath[stepIdx]-S0)/S0; }
+function ddLevel(dd){ return Math.max(0, Math.floor(-dd/0.05)); }
+
+function pickWorstAsset(stepIdx){
+  let worst=null, worstDD=0;
+  for(let i=0;i<N;i++){
+    if(weights[i]<=0.0001) continue;
+    const dd=(sim.stressAssets[i][stepIdx]/sim.stressAssets[i][0])-1;
+    if(dd<worstDD){ worstDD=dd; worst=i; }
+  }
+  if(worst===null){
+    // fallback: weighted random
+    let r=Math.random(), c=0;
+    for(let i=0;i<N;i++){ c+=weights[i]; if(r<c){worst=i; break;}}
+  }
+  return {idx:worst, dd:(sim.stressAssets[worst][stepIdx]/sim.stressAssets[worst][0])-1};
+}
+
+function tick(){
+  step++;
+  if(step>=weeks){ step=weeks; playing=false; done=true; stopAnim(); renderAll(); return; }
+  if(!hasSold){
+    const dd=getDrawdown(step);
+    if(dd<-0.0001){
+      const lvl=ddLevel(dd);
+      if(lvl>=1 && lvl<=8 && !firedLevels.has(lvl)){
+        firedLevels.add(lvl);
+        const phase=phaseAt(sim.phaseSched,step);
+        const worst=pickWorstAsset(step);
+        const worstName=worst.idx!==null ? ASSETS[worst.idx].name : '포트폴리오 전체';
+        const newsPool=NEWS[worstName] && NEWS[worstName][phase] ? NEWS[worstName][phase] : null;
+        const headline = newsPool ? pickRand(newsPool) : '📰 "글로벌 위험회피, 모든 자산군 동반 하락"';
+        pendingDP={step, level:-lvl*0.05, value:sim.stressPath[step], phase, worst:worstName, worstDD:worst.dd, headline};
+        playing=false; stopAnim();
+      }
+    }
+  }
+  renderChart(); renderProgress(); renderStressCtrl(); renderPhaseBadge();
+  if(pendingDP) renderDP();
+}
+function togglePlay(){
+  if(pendingDP) return;
+  playing=!playing;
+  if(playing){ stopAnim(); animTimer=setInterval(tick,75); }
+  else stopAnim();
+  renderStressCtrl();
+}
+function setFanMode(){ stopAnim(); mode='fan'; playing=false; renderAll(); }
+function setStressMode(){
+  stopAnim(); mode='stress'; step=0; decisions=[]; pendingDP=null; done=false;
+  firedLevels.clear(); hasSold=false; playing=true;
+  renderAll();
+  animTimer=setInterval(tick,75);
+}
+function handleDecision(choice){
+  if(!pendingDP) return;
+  decisions.push({...pendingDP, choice});
+  if(choice==='sell') hasSold=true;
+  pendingDP=null; playing=true;
+  stopAnim(); animTimer=setInterval(tick,75);
+  renderAll();
+}
+
+function rerun(){
+  stopAnim(); step=0; playing=false; decisions=[]; pendingDP=null; done=false;
+  firedLevels.clear(); hasSold=false; mode='fan';
+  if(manualMode){
+    const sum=weights.reduce((a,b)=>a+b,0);
+    if(Math.abs(sum-1)>1e-3){ alert('비중 합계가 100%가 아닙니다 ('+(sum*100).toFixed(0)+'%).'); return; }
+  }
+  compute();
+}
+
+/* ============================================================
+   PERCENTILE GEAR MENU
+   ============================================================ */
+function toggleGear(){
+  document.getElementById('gearMenu').classList.toggle('show');
+  document.getElementById('gearBtn').classList.toggle('open');
+}
+function setPercentile(p){
+  targetP=p;
+  document.getElementById('gearMenu').classList.remove('show');
+  document.getElementById('gearBtn').classList.remove('open');
+  document.querySelectorAll('.gear-menu .opt').forEach(o=>o.classList.toggle('sel', +o.dataset.p===p));
+  const url=new URL(location.href); url.searchParams.set('p',p); history.replaceState(null,'',url);
+  // visual cue
+  document.getElementById('gearBtn').style.color = p===10 ? 'var(--danger)' : p===90 ? 'var(--success)' : 'var(--accent)';
+  document.getElementById('gearBtn').style.opacity = '1';
+  rerun();
+}
+document.addEventListener('click',(e)=>{
+  if(!e.target.closest('.gear')) document.getElementById('gearMenu').classList.remove('show');
+});
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+function renderChart(){
+  if(!sim) return;
+  const svg=document.getElementById('mainChart');
+  const W=700,H=280,PL=54,PR=12,PT=14,PB=30,cW=W-PL-PR,cH=H-PT-PB;
+  const {pcts, stressPath, phaseSched}=sim;
+  // y range: symmetric around median[weeks], lower bounded by deepest p10
+  const center = pcts[50][weeks];
+  const p10Min = Math.min(...pcts[10]);
+  const half = Math.max(center - p10Min, S0*0.05);
+  const minV = Math.max(0, p10Min - half*0.02);
+  const maxV = center + half;
+  const xf=t=>PL+t/weeks*cW, yf=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+  const ln=(arr,upTo)=>{const a=upTo!==undefined?arr.slice(0,upTo+1):arr;return a.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('');};
+  const band=(hi,lo)=>{const f=hi.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('');const b=[...lo].reverse().map((v,i)=>`L${xf(lo.length-1-i).toFixed(1)},${yf(v).toFixed(1)}`).join('');return f+b+'Z';};
+  // Stress path only visible in stress mode; clip to current step
+  const visSP = mode==='stress' ? stressPath.slice(0,step+1) : null;
+  const spD = visSP ? visSP.map((v,i)=>`${i?'L':'M'}${xf(i).toFixed(1)},${yf(v).toFixed(1)}`).join('') : '';
+  const cs=Math.min(step,stressPath.length-1);
+  const cx=xf(cs).toFixed(1), cy=yf(stressPath[cs]).toFixed(1);
+  // % gridlines
+  const minR=(minV-S0)/S0, maxR=(maxV-S0)/S0, rangeR=maxR-minR;
+  const stepCand=[0.02,0.05,0.10,0.20,0.25,0.50,1.00,2.00,5.00];
+  const stepR=stepCand.find(s=>rangeR/s<=8) || 5.00;
+  const lo=Math.floor(minR/stepR)*stepR, hi=Math.ceil(maxR/stepR)*stepR;
+  const grids=[]; for(let r=lo; r<=hi+1e-9; r+=stepR){ const v=S0*(1+r); if(v>=minV*0.999 && v<=maxV*1.001) grids.push({r,v}); }
+  // x-axis ticks in months
+  const monthsTotal = Math.round(weeks*12/52);
+  const moStep = monthsTotal<=12 ? 3 : monthsTotal<=36 ? 6 : monthsTotal<=72 ? 12 : 24;
+  const wTks = []; for(let m=0; m<=monthsTotal; m+=moStep) wTks.push({w: m*52/12, label: fmLabel(m)});
+  const gLines=grids.map(({r,v})=>{
+    const isZero=Math.abs(r)<1e-9;
+    const stroke=isZero ? getCSSVar('--ink-3') : getCSSVar('--hairline');
+    const sw=isZero?'1.2':'1';
+    return `<line x1="${PL}" y1="${yf(v).toFixed(1)}" x2="${PL+cW}" y2="${yf(v).toFixed(1)}" stroke="${stroke}" stroke-width="${sw}"/>
+    <text x="${PL-6}" y="${(yf(v)+4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--mono)" fill="${isZero?getCSSVar('--ink-2'):getCSSVar('--ink-3')}" font-weight="${isZero?'600':'400'}">${fp(r)}</text>`;
+  }).join('');
+  const wLines=wTks.map(({w,label})=>`<line x1="${xf(w).toFixed(1)}" y1="${PT}" x2="${xf(w).toFixed(1)}" y2="${PT+cH}" stroke="${getCSSVar('--hairline')}" stroke-width="1"/>
+    <text x="${xf(w).toFixed(1)}" y="${PT+cH+16}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="${getCSSVar('--ink-3')}">${label}</text>`).join('');
+  // ±1σ analytic paths (fan mode only)
+  const psm=portMuSigma();
+  const sigUp=[], sigDn=[];
+  for(let t=0;t<=weeks;t++){
+    const yr=t/52, drift=(psm.mu-0.5*psm.sig*psm.sig)*yr, sd=psm.sig*Math.sqrt(yr);
+    sigUp.push(S0*Math.exp(drift+sd));
+    sigDn.push(S0*Math.exp(drift-sd));
+  }
+  // Phase transition lines (only in stress mode)
+  let phaseLines='';
+  if(mode==='stress'){
+    for(const seg of phaseSched){
+      if(seg.startWeek===0 || seg.startWeek>step) continue;
+      const x=xf(seg.startWeek).toFixed(1);
+      const c=PHASE_INFO[seg.phase].col;
+      phaseLines+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${PT+cH}" stroke="${c}" stroke-width="1" stroke-dasharray="2,3" opacity=".5"/>
+        <text x="${x}" y="${PT+10}" text-anchor="start" font-size="9" fill="${c}" font-family="var(--sans)" opacity=".7">${PHASE_INFO[seg.phase].icon} ${seg.phase}</text>`;
+    }
+  }
+  // Decision markers
+  const decM=decisions.map(d=>{
+    const col=d.choice==='sell'?'#BA7517':d.choice==='buy'?'#1D9E75':'#64748b';
+    const lbl=d.choice==='sell'?'매도':d.choice==='buy'?'매수':'보유';
+    const dx=xf(d.step).toFixed(1), dy=yf(stressPath[d.step]).toFixed(1);
+    return`<circle cx="${dx}" cy="${dy}" r="5" fill="${col}" stroke="white" stroke-width="1.5"/><text x="${dx}" y="${(parseFloat(dy)-9).toFixed(1)}" text-anchor="middle" font-size="9" fill="${col}" font-family="var(--sans)" font-weight="600">${lbl}</text>`;
+  }).join('');
+  const targetCol = targetP===10 ? getCSSVar('--danger') : targetP===90 ? getCSSVar('--success') : getCSSVar('--accent');
+  const sigCol=getCSSVar('--warn');
+  const sigPaths = mode==='fan' ? `
+    <path d="${ln(sigUp)}" fill="none" stroke="${sigCol}" stroke-width="1.2" stroke-dasharray="3,3" opacity=".75"/>
+    <path d="${ln(sigDn)}" fill="none" stroke="${sigCol}" stroke-width="1.2" stroke-dasharray="3,3" opacity=".75"/>` : '';
+  const stressLayer = mode==='stress' ? `
+    <path d="${ln(pcts[targetP])}" fill="none" stroke="${targetCol}" stroke-width="1.5" stroke-dasharray="5,3" opacity=".18"/>
+    <path d="${spD}" fill="none" stroke="${targetCol}" stroke-width="2.5" opacity="1"/>
+    ${step>0?`<circle cx="${cx}" cy="${cy}" r="5" fill="${targetCol}" stroke="rgba(168,57,44,.25)" stroke-width="7"/>`:''}` : '';
+  const legendItems = mode==='fan'
+    ? `<line x1="2" y1="10" x2="22" y2="10" stroke="${getCSSVar('--success')}" stroke-width="2"/>
+       <text x="26" y="14" font-size="10.5" font-family="var(--sans)" fill="${getCSSVar('--ink-2')}">중앙값</text>
+       <line x1="78" y1="10" x2="98" y2="10" stroke="${sigCol}" stroke-width="1.2" stroke-dasharray="3,3"/>
+       <text x="102" y="14" font-size="10.5" font-family="var(--sans)" fill="${getCSSVar('--ink-2')}">±1σ (68%)</text>
+       <rect x="170" y="6" width="10" height="8" fill="rgba(29,78,216,0.22)"/>
+       <text x="184" y="14" font-size="10.5" font-family="var(--sans)" fill="${getCSSVar('--ink-2')}">5–95%</text>`
+    : `<line x1="2" y1="10" x2="22" y2="10" stroke="${getCSSVar('--success')}" stroke-width="2"/>
+       <text x="26" y="14" font-size="10.5" font-family="var(--sans)" fill="${getCSSVar('--ink-2')}">중앙값</text>
+       <line x1="78" y1="10" x2="98" y2="10" stroke="${targetCol}" stroke-width="2"/>
+       <text x="102" y="14" font-size="10.5" font-family="var(--sans)" fill="${getCSSVar('--ink-2')}">${targetP===10?'하위 10% 경로':targetP===90?'상위 10% 경로':'중앙값 경로'}</text>`;
+  const legendW = mode==='fan' ? 224 : 200;
+  svg.innerHTML=`${gLines}${wLines}${phaseLines}
+    <path d="${band(pcts[90],pcts[10])}" fill="rgba(29,78,216,0.07)"/>
+    <path d="${band(pcts[75],pcts[25])}" fill="rgba(29,78,216,0.14)"/>
+    <text x="${PL+cW-4}" y="${(yf(S0)-4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--sans)" fill="${getCSSVar('--ink-3')}" opacity=".75">원금 ${fwRaw(S0)}</text>
+    ${sigPaths}
+    <path d="${ln(pcts[50])}" fill="none" stroke="${getCSSVar('--success')}" stroke-width="2" opacity=".9"/>
+    ${stressLayer}
+    ${decM}
+    <g transform="translate(${PL+8},${PT+4})">
+      <rect x="-4" y="0" width="${legendW}" height="20" rx="4" fill="${getCSSVar('--bg-soft')}" opacity=".9"/>
+      ${legendItems}
+    </g>`;
+}
+function getCSSVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || name;
+}
+
+function renderProgress(){
+  const wrap=document.getElementById('progWrap'), fill=document.getElementById('progFill');
+  if(mode==='stress'){ wrap.classList.add('show'); fill.style.width=(step/weeks*100).toFixed(1)+'%'; }
+  else wrap.classList.remove('show');
+}
+function renderStressCtrl(){
+  const el=document.getElementById('stressCtrl'), pp=document.getElementById('ppBtn'), prog=document.getElementById('sProg'), val=document.getElementById('sVal');
+  if(mode!=='stress'){ el.classList.remove('show'); return; }
+  el.classList.add('show');
+  pp.textContent = playing?'⏸ 일시정지':'▶ 재생';
+  prog.textContent = done ? `완료 (${fmW(weeks)})` : `${fmW(step)} / ${fmW(weeks)}`;
+  if(sim){
+    const v=sim.stressPath[Math.min(step,sim.stressPath.length-1)], r=(v-S0)/S0;
+    val.textContent=`${fw(v)}원  ${fp(r)}`;
+    val.style.color = r<=-0.2?'var(--danger)' : r<=-0.05?'var(--warn)' : 'var(--success)';
+  }
+}
+function renderPhaseBadge(){
+  const el=document.getElementById('phaseBadge');
+  if(mode!=='stress' || !sim){ el.style.display='none'; return; }
+  const ph=phaseAt(sim.phaseSched, Math.min(step,weeks));
+  const info=PHASE_INFO[ph];
+  el.style.display='inline-flex';
+  el.innerHTML=`<span class="dot" style="background:${info.col}"></span><span>${info.icon} ${ph}</span>
+    <span class="ph-tip">
+      <strong>${info.icon} ${ph} — ${info.short}</strong>
+      ${info.description}
+      <div class="sub">강세: ${info.winners}</div>
+      <div class="sub">약세: ${info.losers}</div>
+      <div class="sub">📅 ${info.historical}</div>
+    </span>`;
+}
+function renderStats(){
+  const row=document.getElementById('statRow');
+  if(mode!=='fan'||!sim){ row.classList.remove('show'); return; }
+  row.classList.add('show');
+  const sb = sigBoundsAt(weeks/52);
+  const items=[
+    {label:'하위 10%',  v:sim.pcts[10][weeks], col:'var(--danger)'},
+    {label:'−1σ (16%)', v:sb.dn,                col:'var(--warn)'},
+    {label:'중앙값',     v:sim.pcts[50][weeks], col:'var(--success)'},
+    {label:'+1σ (84%)', v:sb.up,                col:'var(--accent)'},
+    {label:'상위 90%',  v:sim.pcts[90][weeks], col:'var(--accent-deep)'}
+  ];
+  row.innerHTML=items.map(({label,v,col})=>{const r=(v-S0)/S0; return`<div class="stat"><div class="t">${label}</div><div class="v" style="color:${col}">${fw(v)}원</div><div class="r" style="color:${col}">${fp(r)}</div></div>`;}).join('');
+}
+function renderDP(){
+  const el=document.getElementById('dpPanel');
+  if(!pendingDP || mode!=='stress'){ el.innerHTML=''; return; }
+  const {step:s, level, value, phase, worst, worstDD, headline}=pendingDP;
+  const info=PHASE_INFO[phase];
+  const isLive=Math.abs(level)>=0.25;
+  el.innerHTML=`<div class="dp ${isLive?'shake':''}">
+    <div class="dp-head">
+      <span class="dp-title">결정의 순간 — ${fmW(s)}차</span>
+      <span class="dp-loss">손실 ${fp(level)} · ${fw(value)}원</span>
+    </div>
+    <div class="dp-phase" style="border-left:3px solid ${info.col}">
+      ${info.icon} <b>${phase}</b> — ${info.short}
+      <span class="info-i">i</span>
+      <span class="ph-tip">
+        <strong>${info.icon} ${phase}</strong>
+        ${info.description}
+        <div class="sub">강세: ${info.winners}</div>
+        <div class="sub">약세: ${info.losers}</div>
+        <div class="sub">📅 ${info.historical}</div>
+      </span>
+    </div>
+    <div class="dp-news">
+      ${isLive?'<span class="live"></span>':''}${headline}
+      <div class="worst"><span>가장 하락한 자산: <b>${worst}</b> ${fp(worstDD)}</span><span>${phase}</span></div>
+    </div>
+    <div class="dp-tip">💡 <b>${phase} 투자자 팁:</b> ${info.investorTip}</div>
+    <div class="dp-q">지금 어떻게 하시겠습니까?</div>
+    <div class="choices">
+      <button class="choice hold" onclick="handleDecision('hold')"><div class="ic">🧘</div><div class="nm">존버</div><div class="desc">감정 억누르고 보유</div></button>
+      <button class="choice buy" onclick="handleDecision('buy')"><div class="ic">📈</div><div class="nm">물타기</div><div class="desc">+${fwRaw(S0)} 추가 매수</div></button>
+      <button class="choice sell" onclick="handleDecision('sell')"><div class="ic">🚪</div><div class="nm">손절</div><div class="desc">전량 매도 → 원화 현금</div></button>
+    </div>
+  </div>`;
+}
+function computeFinal(){
+  let units=1, extra=0, soldAt=null, soldStep=null;
+  for(const d of [...decisions].sort((a,b)=>a.step-b.step)){
+    const v=sim.stressPath[d.step];
+    if(d.choice==='buy'){ units+=S0/v; extra+=S0; }
+    else if(d.choice==='sell'){ soldAt=units*v; soldStep=d.step; break; }
+  }
+  const totalIn=S0+extra;
+  let finalV;
+  if(soldAt!==null){
+    const yrs=(weeks-soldStep)/52;
+    finalV = soldAt*Math.pow(1.025, yrs);
+  } else {
+    finalV = units*sim.stressPath[weeks];
+  }
+  return {units, extra, soldAt, soldStep, totalIn, finalV};
+}
+function renderResult(){
+  const el=document.getElementById('resultPanel');
+  if(!done || !sim){ el.style.display='none'; return; }
+  el.style.display='block';
+  const {extra, soldAt, soldStep, totalIn, finalV} = computeFinal();
+  const ret=(finalV-totalIn)/totalIn;
+  const medRet=(sim.pcts[50][weeks]-S0)/S0;
+  const holdRet=(sim.stressPath[weeks]-S0)/S0;
+  const rc=ret>=0?'var(--success)':'var(--danger)';
+  // Decisions log
+  const dlog = decisions.length===0 ? `<div style="font-size:11.5px;color:var(--ink-3)">결정 없음 (자동 보유)</div>` :
+    decisions.map(d=>{
+      const col=d.choice==='sell'?'var(--warn)':d.choice==='buy'?'var(--success)':'var(--ink-3)';
+      const lbl=d.choice==='sell'?'손절 매도':d.choice==='buy'?'추가매수':'존버';
+      return `<div>${fmW(d.step)}차 · <b>${d.phase}</b> · ${fp(d.level)}: <span style="color:${col};font-weight:600">${lbl}</span></div>`;
+    }).join('');
+  // Lesson selection
+  let lessonExtra='';
+  if(soldAt!==null && holdRet>ret) lessonExtra='이번 시뮬에선 손절 후 시장이 회복했습니다. 패닉 매도의 대표적 후회 패턴 — 다시 진입할 타이밍을 잡지 못해 영구 손실을 확정하는 경우가 많습니다.';
+  else if(extra>0 && ret>holdRet) lessonExtra='물타기가 통한 케이스. 단, 추가 자금이 있고 회복 시간이 충분할 때만 가능한 전략임을 잊지 마세요.';
+  else if(decisions.length===0 && holdRet<-0.2) lessonExtra='끝까지 버텼지만 큰 손실. 자산 배분이 위험에 비해 과했을 가능성. 다음 시도엔 채권·금 비중을 늘려 보세요.';
+  else if(ret>0.05) lessonExtra='하위 10% 시나리오에서도 플러스 — 좋은 자산 배분과 결정의 결과입니다.';
+  else lessonExtra='하위 10% 시나리오 체험 완료. 실제로 이 정도 손실이 닥쳤을 때 같은 결정을 할 수 있을지 — 그게 면역의 척도입니다.';
+
+  // Timeline
+  const ph=sim.phaseSched;
+  let segs=[]; for(let i=0;i<ph.length;i++){
+    const start=ph[i].startWeek, end=(i+1<ph.length?ph[i+1].startWeek:weeks);
+    segs.push({phase:ph[i].phase, start, end, len:end-start});
+  }
+  const phaseExp={}; for(const s of segs){ phaseExp[s.phase]=(phaseExp[s.phase]||0)+s.len; }
+  const tlSegs = segs.map(s=>{
+    const info=PHASE_INFO[s.phase];
+    const w=(s.len/weeks*100).toFixed(2);
+    return `<div class="tl-seg" style="flex:${s.len};background:${info.col}">
+      ${s.len/weeks>0.07?info.icon+' '+s.phase:info.icon}
+      <div class="seg-tip">
+        <strong>${info.icon} ${s.phase} — ${fmW(s.start)}~${fmW(s.end)} (${w2mo(s.len)}개월)</strong>
+        ${info.description}
+        <div style="margin-top:6px;color:var(--ink-3)">강세: ${info.winners}</div>
+        <div style="color:var(--ink-3)">약세: ${info.losers}</div>
+        <div style="margin-top:6px;color:var(--ink-3)">📅 ${info.historical}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const tlMarks = decisions.map(d=>`<div class="tl-mark" style="left:${(d.step/weeks*100).toFixed(2)}%" title="${fmW(d.step)}차 ${d.choice==='sell'?'손절':d.choice==='buy'?'물타기':'존버'}"></div>`).join('');
+  // Phase cards
+  const pcards = PHASES.map(p=>{
+    const info=PHASE_INFO[p];
+    const exp = phaseExp[p]||0;
+    return `<div class="pcard ${exp>0?'experienced':''}" style="border-color:${exp>0?info.col:'var(--hairline)'};">
+      ${exp>0?`<span class="ph-exp" style="background:${info.col}">${exp}주 경험</span>`:''}
+      <div class="ph-head"><span class="ph-icon">${info.icon}</span><span class="ph-name" style="color:${info.col}">${p}</span></div>
+      <div class="ph-short">${info.short}</div>
+      <div class="ph-desc">${info.description}</div>
+      <ul class="ph-bullets">
+        <li><b>강세</b> ${info.winners}</li>
+        <li><b>약세</b> ${info.losers}</li>
+      </ul>
+      <div class="ph-tip-line">💡 ${info.investorTip}</div>
+      <div class="ph-hist">📅 ${info.historical}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <h2>시뮬레이션 완료</h2>
+    <div class="result-top">
+      <div>
+        <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:4px">내 최종 결과</div>
+        <div class="result-final" style="color:${rc}">${fwRaw(finalV)}</div>
+        <div class="result-final-r" style="color:${rc}">${fp(ret)}${soldAt!==null?` · ${fmW(soldStep)}차 손절 후 현금`:''}${extra>0?` · +${fwRaw(extra)} 추가 투입`:''}</div>
+        <div class="result-decisions">${dlog}</div>
+      </div>
+      <div>
+        <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:6px">비교</div>
+        <div class="result-cmp">
+          <div><span class="nm">중앙값 시나리오 끝까지 보유:</span> <span class="v" style="color:var(--success)">${fp(medRet)}</span></div>
+          <div><span class="nm">하위 10% 끝까지 존버:</span> <span class="v" style="color:${holdRet>=0?'var(--accent)':'var(--danger)'}">${fp(holdRet)}</span></div>
+          <div><span class="nm">총 투입금 vs 최종:</span> <span class="v">${fwRaw(totalIn)} → ${fwRaw(finalV)}</span></div>
+        </div>
+        <div class="lesson">💡 <b>오늘의 교훈</b> — ${lessonExtra}<br>"${decisions.length===0?'세네카: 우리는 현실보다 상상 속에서 더 많이 고통받는다.':'탈레브: 폭락은 평균이 아니라 꼬리에서 결판난다.'}"</div>
+      </div>
+    </div>
+    <div class="timeline">
+      <h3>거시 흐름 — 거쳐온 경기 국면</h3>
+      <div class="tl-bar">${tlSegs}<div class="tl-decisions">${tlMarks}</div></div>
+      <div class="tl-axis"><span>시작</span><span>${fmW(weeks/4)}</span><span>${fmW(weeks/2)}</span><span>${fmW(weeks*3/4)}</span><span>${fmW(weeks)}</span></div>
+      <div style="font-size:10.5px;color:var(--ink-3);margin-top:4px">결정 마커: ${decisions.map(d=>`<span style="display:inline-block;margin-right:8px">${fmW(d.step)}차 ${d.choice==='sell'?'🚪손절':d.choice==='buy'?'📈매수':'🧘존버'}</span>`).join('')||'(결정 없음)'}</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--ink-2);margin-top:18px;margin-bottom:6px">📚 4국면 학습 카드 — 한 사이클을 통째로</div>
+    <div class="phase-cards">${pcards}</div>
+    <div class="actions">
+      <button class="btn primary" onclick="setStressMode()">다시 도전 ↻</button>
+      <button class="btn" onclick="rerun()">새 시나리오 생성</button>
+      <button class="btn" onclick="setFanMode()">시나리오 분포 보기</button>
+    </div>`;
+}
+function renderModeBtns(){
+  document.getElementById('btnFan').classList.toggle('active', mode==='fan');
+  document.getElementById('btnStress').classList.toggle('active', mode==='stress');
+  document.getElementById('guide').style.display = mode==='fan'?'block':'none';
+}
+function renderSigmaHelp(){
+  const el=document.getElementById('sigmaHelp');
+  if(mode!=='fan' || !sim){ el.classList.remove('show'); return; }
+  el.classList.add('show');
+  const yrT=weeks/52;
+  const rows=[{lbl:'1년', yr:1},{lbl:'3년', yr:3}];
+  // append simulated period if it's not 1 or 3
+  if(Math.abs(yrT-1)>0.05 && Math.abs(yrT-3)>0.05) rows.push({lbl:`이번 시뮬(${fmW(weeks)})`, yr:yrT});
+  const inner = rows.map(r=>{const sb=sigBoundsAt(r.yr); return `<span>${r.lbl}: <b style="color:var(--danger)">${fp(sb.dnR)}</b> ~ <b style="color:var(--accent)">${fp(sb.upR)}</b></span>`;}).join('');
+  el.innerHTML=`<b>±1σ 정상 범위</b> · 약 68%의 시나리오가 이 안에 들어옵니다 — <span style="color:var(--ink-3)">투자에 대한 적정 기대 수준</span>.
+    <div class="row">${inner}</div>`;
+}
+function renderAll(){
+  renderChart(); renderStats(); renderSigmaHelp(); renderProgress(); renderStressCtrl();
+  renderPhaseBadge(); renderDP(); renderResult(); renderModeBtns();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+const pbEl=document.getElementById('presetBtns');
+Object.entries(PRESETS).forEach(([k,p])=>{
+  const b=document.createElement('button');
+  b.className='btn'+(k===presetKey?' active':'');
+  b.dataset.k=k; b.textContent=p.label;
+  b.onclick=()=>applyPreset(k);
+  pbEl.appendChild(b);
+});
+document.getElementById('manualToggle').onclick=toggleManual;
+
+const s0Sl=document.getElementById('s0Sl');
+const s0Lbl=document.getElementById('s0Lbl');
+function snapS0(v){
+  if(v<=10_000_000) return Math.max(1_000_000, Math.round(v/1_000_000)*1_000_000);   // ≤1천만 → 100만 단위
+  if(v<=100_000_000) return Math.round(v/10_000_000)*10_000_000;                       // ≤1억 → 1천만 단위
+  return Math.round(v/100_000_000)*100_000_000;                                         // >1억 → 1억 단위
+}
+function setS0Label(){
+  const unit = S0<=10_000_000 ? '100만' : S0<=100_000_000 ? '1,000만' : '1억';
+  s0Lbl.innerHTML=`${fwRaw(S0)} <span style="color:var(--ink-3);font-weight:400;font-size:10.5px">· ${unit} 단위</span>`;
+}
+s0Sl.value=S0;
+s0Sl.oninput=()=>{ S0=snapS0(+s0Sl.value); s0Sl.value=S0; setS0Label(); };
+setS0Label();
+
+const wSl=document.getElementById('wSl');
+wSl.value=weeks;
+const wLbl=document.getElementById('wLbl');
+const setWLbl=()=>{ wLbl.textContent=`${w2mo(weeks)}개월 (${(weeks/52).toFixed(1)}년)`; };
+wSl.oninput=()=>{ weeks=+wSl.value; setWLbl(); };
+setWLbl();
+
+// URL ?p= parsing
+const urlP=parseInt(new URL(location.href).searchParams.get('p'),10);
+if([10,50,90].includes(urlP)) targetP=urlP;
+document.querySelectorAll('.gear-menu .opt').forEach(o=>o.classList.toggle('sel', +o.dataset.p===targetP));
+if(targetP!==10){
+  document.getElementById('gearBtn').style.color = targetP===90?'var(--success)':'var(--accent)';
+  document.getElementById('gearBtn').style.opacity='1';
+}
+
+// Initial render
+renderQuote();
+applyPreset(presetKey);
+</script>
+</body>
+</html>
