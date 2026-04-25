@@ -311,7 +311,7 @@ footer p{margin:.3em 0}
 const ASSETS = [
   {key:'sp500',  name:'S&P500',     short:'SP',  cat:'주식', mu:0.10,  sig:0.18},
   {key:'ndx',    name:'NASDAQ100',  short:'NDX', cat:'주식', mu:0.13,  sig:0.24},
-  {key:'kr',     name:'한국주식',    short:'KR',  cat:'주식', mu:0.07,  sig:0.22},
+  {key:'kr',     name:'코스피200',   short:'KR',  cat:'주식', mu:0.07,  sig:0.22},
   {key:'dev',    name:'선진국',      short:'DEV', cat:'주식', mu:0.06,  sig:0.18},
   {key:'em',     name:'신흥국',      short:'EM',  cat:'주식', mu:0.08,  sig:0.23},
   {key:'krb',    name:'한국채(3y)',  short:'KRB', cat:'채권', mu:0.034, sig:0.03},
@@ -513,7 +513,7 @@ const NEWS={
       '📰 "대형 SaaS ARR 첫 마이너스, 멀티플 1/3 토막"'
     ]
   },
-  '한국주식':{
+  '코스피200':{
     '회복기':[
       '📰 "외국인 5거래일 연속 순매도 — 한국 회복 의구심"',
       '📰 "삼성전자 어닝 가이던스 하회, IT 사이클 회복 지연"',
@@ -935,11 +935,11 @@ function compute(){
    ALLOCATION CONTROLS
    ============================================================ */
 const PRESETS={
-  SP100:  { label:'S&P500 100%',  weights:[1,0,0,0,0,0,0,0,0,0,0], desc:'미국 대형주 단일 집중' },
-  NDX100: { label:'NASDAQ100 100%',weights:[0,1,0,0,0,0,0,0,0,0,0], desc:'미국 기술주 단일 집중' },
-  KR100:  { label:'한국주식 100%', weights:[0,0,1,0,0,0,0,0,0,0,0], desc:'코스피 단일 집중' },
-  BTC100: { label:'비트코인 100%', weights:[0,0,0,0,0,0,0,0,0,0,1], desc:'암호화폐 단일 집중' },
-  DIV:    { label:'분산 (Permanent+)', weights:[0.20,0.05,0.10,0.05,0.10,0.10,0.10,0.20,0.05,0.05,0], desc:'주식 50 / 채권 20 / 금 20 / FX·현금 10' }
+  SP100:  { label:'S&P500 100%',   weights:[1,0,0,0,0,0,0,0,0,0,0] },
+  NDX100: { label:'NASDAQ100 100%',weights:[0,1,0,0,0,0,0,0,0,0,0] },
+  KR100:  { label:'코스피200 100%', weights:[0,0,1,0,0,0,0,0,0,0,0] },
+  BTC100: { label:'비트코인 100%', weights:[0,0,0,0,0,0,0,0,0,0,1] },
+  DIV:    { label:'분산 투자 (주식 50% 기타 50%)', weights:[0.20,0.05,0.10,0.05,0.10,0.10,0.10,0.20,0.05,0.05,0] }
 };
 function applyPreset(k){
   presetKey=k; manualMode=false;
@@ -948,7 +948,7 @@ function applyPreset(k){
   document.getElementById('sumRow').style.display='none';
   document.getElementById('manualToggle').textContent='직접 입력';
   document.querySelectorAll('#presetBtns .btn').forEach(b=>b.classList.toggle('active', b.dataset.k===k));
-  document.getElementById('presetDesc').textContent=PRESETS[k].desc + ' · 비중: ' + weights.map((w,i)=>w>0?`${ASSETS[i].short} ${(w*100).toFixed(0)}`:null).filter(Boolean).join(' / ');
+  document.getElementById('presetDesc').textContent = weights.map((w,i)=>w>0?`${ASSETS[i].name} ${(w*100).toFixed(0)}%`:null).filter(Boolean).join(' · ');
   refreshWeightsBox();
   renderAllocStats();
   compute();
